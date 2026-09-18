@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -237,6 +238,35 @@ public class TestMono2 {
         var transformedCtx = transformed.context().block();
         Assertions.assertEquals("T", transformedCtx._1);
         Assertions.assertEquals("transform", transformedCtx._2.orElseThrow().getMessage());
+    }
+
+    @Test
+    public void testGetS6To8() {
+        var base = Mono2.contextOf(1);
+        Function<Integer, Integer> plus = n -> n;
+
+        var t6 = base.getS6(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5).value().block();
+        Assertions.assertEquals(Tuple.of(1, 2, 3, 4, 5, 6), t6);
+        Assertions.assertEquals(21, base.getS6map(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5,
+            (a, b, c, d, e, f) -> a + b + c + d + e + f).value().block());
+        Assertions.assertEquals(21, base.getS6mapM(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5,
+            (a, b, c, d, e, f) -> Mono.just(a + b + c + d + e + f)).value().block());
+        Assertions.assertEquals(21, base.getS6mapF(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5,
+            (a, b, c, d, e, f) -> CompletableFuture.completedFuture(a + b + c + d + e + f)).value().block());
+
+        var t7 = base.getS7(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6).value().block();
+        Assertions.assertEquals(Tuple.of(1, 2, 3, 4, 5, 6, 7), t7);
+        Assertions.assertEquals(28, base.getS7map(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6,
+            (a, b, c, d, e, f, g) -> a + b + c + d + e + f + g).value().block());
+
+        var t8 = base.getS8(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6, c -> c + 7).value().block();
+        Assertions.assertEquals(Tuple.of(1, 2, 3, 4, 5, 6, 7, 8), t8);
+        Assertions.assertEquals(36, base.getS8map(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6, c -> c + 7,
+            (a, b, c, d, e, f, g, h) -> a + b + c + d + e + f + g + h).value().block());
+        Assertions.assertEquals(36, base.getS8mapM(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6, c -> c + 7,
+            (a, b, c, d, e, f, g, h) -> Mono.just(a + b + c + d + e + f + g + h)).value().block());
+        Assertions.assertEquals(36, base.getS8mapF(plus, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6, c -> c + 7,
+            (a, b, c, d, e, f, g, h) -> CompletableFuture.completedFuture(a + b + c + d + e + f + g + h)).value().block());
     }
 
     private static Throwable rootCause(Throwable t) {

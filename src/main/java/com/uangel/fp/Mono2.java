@@ -367,4 +367,52 @@ public class Mono2<C, V> {
     public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? extends CompletionStage<R>> mf) {
         return getS5(g1, g2, g3, g4, g5).mapF(t -> mf.apply(t._1,t._2,t._3,t._4, t._5));
     }
+
+    public <A1, A2, A3, A4, A5, A6> Mono2<C, Tuple6<A1, A2, A3, A4, A5, A6>> getS6(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6) {
+        return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c), g4.apply(c), g5.apply(c), g6.apply(c)));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, R> Mono2<C, R> getS6map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function6<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? extends R> mf) {
+        return getS6(g1, g2, g3, g4, g5, g6).map(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, R> Mono2<C, R> getS6mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function6<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, Mono<@NonNull R>> mf) {
+        return getS6(g1, g2, g3, g4, g5, g6).mapM(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, R> Mono2<C, R> getS6mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function6<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? extends CompletionStage<R>> mf) {
+        return getS6(g1, g2, g3, g4, g5, g6).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7> Mono2<C, Tuple7<A1, A2, A3, A4, A5, A6, A7>> getS7(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7) {
+        return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c), g4.apply(c), g5.apply(c), g6.apply(c), g7.apply(c)));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, R> Mono2<C, R> getS7map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function7<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? extends R> mf) {
+        return getS7(g1, g2, g3, g4, g5, g6, g7).map(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, R> Mono2<C, R> getS7mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function7<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, Mono<@NonNull R>> mf) {
+        return getS7(g1, g2, g3, g4, g5, g6, g7).mapM(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, R> Mono2<C, R> getS7mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function7<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? extends CompletionStage<R>> mf) {
+        return getS7(g1, g2, g3, g4, g5, g6, g7).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, A8> Mono2<C, Tuple8<A1, A2, A3, A4, A5, A6, A7, A8>> getS8(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function<? super C, ? extends A8> g8) {
+        return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c), g4.apply(c), g5.apply(c), g6.apply(c), g7.apply(c), g8.apply(c)));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, A8, R> Mono2<C, R> getS8map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function<? super C, ? extends A8> g8, Function8<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? super A8, ? extends R> mf) {
+        return getS8(g1, g2, g3, g4, g5, g6, g7, g8).map(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7, t._8));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, A8, R> Mono2<C, R> getS8mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function<? super C, ? extends A8> g8, Function8<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? super A8, Mono<@NonNull R>> mf) {
+        return getS8(g1, g2, g3, g4, g5, g6, g7, g8).mapM(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7, t._8));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, A8, R> Mono2<C, R> getS8mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function<? super C, ? extends A8> g8, Function8<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? super A8, ? extends CompletionStage<R>> mf) {
+        return getS8(g1, g2, g3, g4, g5, g6, g7, g8).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7, t._8));
+    }
 }
