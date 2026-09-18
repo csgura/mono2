@@ -397,6 +397,43 @@ public class TestMono2 {
             (a, b, c, d, e, f, g, h) -> CompletableFuture.completedFuture(a + b + c + d + e + f + g + h)).value().block());
     }
 
+    @Test
+    public void testZgetS2To7() {
+        var base = Mono2.of(10, "v");
+        Function<Integer, Integer> id = c -> c;
+
+        Assertions.assertEquals(Tuple.of(10, 11, "v"),
+            base.zgetS2(id, c -> c + 1).value().block());
+        Assertions.assertEquals("10:11:v",
+            base.zgetS2map(id, c -> c + 1, (a, b, v) -> a + ":" + b + ":" + v).value().block());
+        Assertions.assertEquals("10:11:v",
+            base.zgetS2mapM(id, c -> c + 1, (a, b, v) -> Mono.just(a + ":" + b + ":" + v)).value().block());
+        Assertions.assertEquals("10:11:v",
+            base.zgetS2mapF(id, c -> c + 1, (a, b, v) -> CompletableFuture.completedFuture(a + ":" + b + ":" + v)).value().block());
+
+        Assertions.assertEquals(Tuple.of(10, 11, 12, "v"),
+            base.zgetS3(id, c -> c + 1, c -> c + 2).value().block());
+        Assertions.assertEquals(Tuple.of(10, 11, 12, 13, "v"),
+            base.zgetS4(id, c -> c + 1, c -> c + 2, c -> c + 3).value().block());
+        Assertions.assertEquals("v",
+            base.zgetS4map(id, c -> c + 1, c -> c + 2, c -> c + 3, (a, b, c, d, v) -> v).value().block());
+        Assertions.assertEquals(Tuple.of(10, 11, 12, 13, 14, "v"),
+            base.zgetS5(id, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4).value().block());
+        Assertions.assertEquals(Tuple.of(10, 11, 12, 13, 14, 15, "v"),
+            base.zgetS6(id, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5).value().block());
+        Assertions.assertEquals(Tuple.of(10, 11, 12, 13, 14, 15, 16, "v"),
+            base.zgetS7(id, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6).value().block());
+        Assertions.assertEquals(92,
+            base.zgetS7map(id, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6,
+                (a, b, c, d, e, f, g, v) -> a + b + c + d + e + f + g + v.length()).value().block());
+        Assertions.assertEquals(92,
+            base.zgetS7mapM(id, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6,
+                (a, b, c, d, e, f, g, v) -> Mono.just(a + b + c + d + e + f + g + v.length())).value().block());
+        Assertions.assertEquals(92,
+            base.zgetS7mapF(id, c -> c + 1, c -> c + 2, c -> c + 3, c -> c + 4, c -> c + 5, c -> c + 6,
+                (a, b, c, d, e, f, g, v) -> CompletableFuture.completedFuture(a + b + c + d + e + f + g + v.length())).value().block());
+    }
+
     private static Throwable rootCause(Throwable t) {
         var cur = t;
         while (cur.getCause() != null && cur.getCause() != cur) {

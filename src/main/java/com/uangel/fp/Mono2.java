@@ -554,6 +554,22 @@ public class Mono2<C, V> {
         return getS2(g1, g2).mapF(t -> mf.apply(t._1,t._2));
     }
 
+    public <A, B> Mono2<C, Tuple3<A, B, V>> zgetS2(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2) {
+        return zgetC().map(t -> Tuple.of(g1.apply(t._1), g2.apply(t._1), t._2));
+    }
+
+    public <A, B, R> Mono2<C, R> zgetS2map(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2, Function3<? super A, ? super B, ? super V, ? extends R> mf) {
+        return zgetS2(g1, g2).map(t -> mf.apply(t._1, t._2, t._3));
+    }
+
+    public <A, B, R> Mono2<C, R> zgetS2mapM(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2, Function3<? super A, ? super B, ? super V, Mono<@NonNull R>> mf) {
+        return zgetS2(g1, g2).mapM(t -> mf.apply(t._1, t._2, t._3));
+    }
+
+    public <A, B, R> Mono2<C, R> zgetS2mapF(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2, Function3<? super A, ? super B, ? super V, ? extends CompletionStage<R>> mf) {
+        return zgetS2(g1, g2).mapF(t -> mf.apply(t._1, t._2, t._3));
+    }
+
     public <A1, A2, A3> Mono2<C, Tuple3<A1, A2, A3>> getS3(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3) {
         return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c)));
     }
@@ -568,6 +584,22 @@ public class Mono2<C, V> {
 
     public <A1, A2, A3, R> Mono2<C, R> getS3mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function3<A1, A2, A3, CompletableFuture<R>> mf) {
         return getS3(g1, g2, g3).mapF(t -> mf.apply(t._1,t._2,t._3));
+    }
+
+    public <A1, A2, A3> Mono2<C, Tuple4<A1, A2, A3, V>> zgetS3(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3) {
+        return zgetC().map(t -> Tuple.of(g1.apply(t._1), g2.apply(t._1), g3.apply(t._1), t._2));
+    }
+
+    public <A1, A2, A3, R> Mono2<C, R> zgetS3map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function4<? super A1, ? super A2, ? super A3, ? super V, ? extends R> mf) {
+        return zgetS3(g1, g2, g3).map(t -> mf.apply(t._1, t._2, t._3, t._4));
+    }
+
+    public <A1, A2, A3, R> Mono2<C, R> zgetS3mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function4<? super A1, ? super A2, ? super A3, ? super V, Mono<@NonNull R>> mf) {
+        return zgetS3(g1, g2, g3).mapM(t -> mf.apply(t._1, t._2, t._3, t._4));
+    }
+
+    public <A1, A2, A3, R> Mono2<C, R> zgetS3mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function4<? super A1, ? super A2, ? super A3, ? super V, ? extends CompletionStage<R>> mf) {
+        return zgetS3(g1, g2, g3).mapF(t -> mf.apply(t._1, t._2, t._3, t._4));
     }
 
     public <A1, A2, A3, A4> Mono2<C, Tuple4<A1, A2, A3, A4>> getS4(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4) {
@@ -586,6 +618,22 @@ public class Mono2<C, V> {
         return getS4(g1, g2, g3, g4).mapF(t -> mf.apply(t._1,t._2,t._3,t._4));
     }
 
+    public <A1, A2, A3, A4> Mono2<C, Tuple5<A1, A2, A3, A4, V>> zgetS4(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4) {
+        return zgetC().map(t -> Tuple.of(g1.apply(t._1), g2.apply(t._1), g3.apply(t._1), g4.apply(t._1), t._2));
+    }
+
+    public <A1, A2, A3, A4, R> Mono2<C, R> zgetS4map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super V, ? extends R> mf) {
+        return zgetS4(g1, g2, g3, g4).map(t -> mf.apply(t._1, t._2, t._3, t._4, t._5));
+    }
+
+    public <A1, A2, A3, A4, R> Mono2<C, R> zgetS4mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super V, Mono<@NonNull R>> mf) {
+        return zgetS4(g1, g2, g3, g4).mapM(t -> mf.apply(t._1, t._2, t._3, t._4, t._5));
+    }
+
+    public <A1, A2, A3, A4, R> Mono2<C, R> zgetS4mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super V, ? extends CompletionStage<R>> mf) {
+        return zgetS4(g1, g2, g3, g4).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5));
+    }
+
     public <A1, A2, A3, A4, A5> Mono2<C, Tuple5<A1, A2, A3, A4, A5>> getS5(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5) {
         return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c), g4.apply(c), g5.apply(c)));
     }
@@ -600,6 +648,22 @@ public class Mono2<C, V> {
 
     public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? extends CompletionStage<R>> mf) {
         return getS5(g1, g2, g3, g4, g5).mapF(t -> mf.apply(t._1,t._2,t._3,t._4, t._5));
+    }
+
+    public <A1, A2, A3, A4, A5> Mono2<C, Tuple6<A1, A2, A3, A4, A5, V>> zgetS5(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5) {
+        return zgetC().map(t -> Tuple.of(g1.apply(t._1), g2.apply(t._1), g3.apply(t._1), g4.apply(t._1), g5.apply(t._1), t._2));
+    }
+
+    public <A1, A2, A3, A4, A5, R> Mono2<C, R> zgetS5map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function6<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super V, ? extends R> mf) {
+        return zgetS5(g1, g2, g3, g4, g5).map(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6));
+    }
+
+    public <A1, A2, A3, A4, A5, R> Mono2<C, R> zgetS5mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function6<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super V, Mono<@NonNull R>> mf) {
+        return zgetS5(g1, g2, g3, g4, g5).mapM(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6));
+    }
+
+    public <A1, A2, A3, A4, A5, R> Mono2<C, R> zgetS5mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function6<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super V, ? extends CompletionStage<R>> mf) {
+        return zgetS5(g1, g2, g3, g4, g5).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6));
     }
 
     public <A1, A2, A3, A4, A5, A6> Mono2<C, Tuple6<A1, A2, A3, A4, A5, A6>> getS6(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6) {
@@ -618,6 +682,22 @@ public class Mono2<C, V> {
         return getS6(g1, g2, g3, g4, g5, g6).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6));
     }
 
+    public <A1, A2, A3, A4, A5, A6> Mono2<C, Tuple7<A1, A2, A3, A4, A5, A6, V>> zgetS6(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6) {
+        return zgetC().map(t -> Tuple.of(g1.apply(t._1), g2.apply(t._1), g3.apply(t._1), g4.apply(t._1), g5.apply(t._1), g6.apply(t._1), t._2));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, R> Mono2<C, R> zgetS6map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function7<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super V, ? extends R> mf) {
+        return zgetS6(g1, g2, g3, g4, g5, g6).map(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, R> Mono2<C, R> zgetS6mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function7<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super V, Mono<@NonNull R>> mf) {
+        return zgetS6(g1, g2, g3, g4, g5, g6).mapM(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, R> Mono2<C, R> zgetS6mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function7<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super V, ? extends CompletionStage<R>> mf) {
+        return zgetS6(g1, g2, g3, g4, g5, g6).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7));
+    }
+
     public <A1, A2, A3, A4, A5, A6, A7> Mono2<C, Tuple7<A1, A2, A3, A4, A5, A6, A7>> getS7(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7) {
         return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c), g4.apply(c), g5.apply(c), g6.apply(c), g7.apply(c)));
     }
@@ -632,6 +712,22 @@ public class Mono2<C, V> {
 
     public <A1, A2, A3, A4, A5, A6, A7, R> Mono2<C, R> getS7mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function7<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? extends CompletionStage<R>> mf) {
         return getS7(g1, g2, g3, g4, g5, g6, g7).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7> Mono2<C, Tuple8<A1, A2, A3, A4, A5, A6, A7, V>> zgetS7(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7) {
+        return zgetC().map(t -> Tuple.of(g1.apply(t._1), g2.apply(t._1), g3.apply(t._1), g4.apply(t._1), g5.apply(t._1), g6.apply(t._1), g7.apply(t._1), t._2));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, R> Mono2<C, R> zgetS7map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function8<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? super V, ? extends R> mf) {
+        return zgetS7(g1, g2, g3, g4, g5, g6, g7).map(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7, t._8));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, R> Mono2<C, R> zgetS7mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function8<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? super V, Mono<@NonNull R>> mf) {
+        return zgetS7(g1, g2, g3, g4, g5, g6, g7).mapM(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7, t._8));
+    }
+
+    public <A1, A2, A3, A4, A5, A6, A7, R> Mono2<C, R> zgetS7mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function8<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? super V, ? extends CompletionStage<R>> mf) {
+        return zgetS7(g1, g2, g3, g4, g5, g6, g7).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7, t._8));
     }
 
     public <A1, A2, A3, A4, A5, A6, A7, A8> Mono2<C, Tuple8<A1, A2, A3, A4, A5, A6, A7, A8>> getS8(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function<? super C, ? extends A8> g8) {

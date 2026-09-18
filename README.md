@@ -112,8 +112,9 @@ var result = Mono2.contextOf(StyleContext.empty())
 ### Context
 
 - `getC` / `getS` / `getM` / `getF` / `getT` — `C`에서 값을 꺼내 `V`로
-- `zgetC`, `zgetS`, … — 꺼낸 값과 기존 `V`를 tuple로
+- `zgetC`, `zgetS`, … — 꺼낸 값과 기존 `V`를 tuple로 (`V`가 마지막)
 - `getS2` … `getS8`, `getSNmap` / `mapM` / `mapF` — `C`의 필드를 여러 개 꺼내 함수 호출
+- `zgetS2` … `zgetS7`, `zgetSNmap` / `mapM` / `mapF` — getter N개 + 기존 `V`를 tuple로 (`zgetS7` → `Tuple8`)
 - `putWith((c, v) -> c')` — `V`를 `C`에 반영하고 `V`는 `Tuple0`
 - `putSet` — mutable `C`에 in-place 반영
 - `modify` / `modifyWith` — `C` 타입 변경 (성공/실패 콜백 필수)
