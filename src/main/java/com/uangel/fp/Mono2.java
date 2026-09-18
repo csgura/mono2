@@ -31,6 +31,8 @@ name convention:
  transform 은 성공일 때 C,V 둘다 바꾸는 것을 의미
  either는 성공/실패 두가지 경우에 대해 , C,V 둘다 바꾸는 것을 의미
  recover 는 error 를 복구하는 것을 의미
+ z 는 get 앞에 붙는 경우 C와 V 를 tuple로 zip 해서 리턴 한다는 의미
+ z 가 map 앞에 붙는 경우 callback 에서 C,V 를 둘 다 아규먼트로 받는 다는 의미
 
  끝에 S 는 Supplier
  끝에 T 는 Try
@@ -315,12 +317,24 @@ public class Mono2<C, V> {
         return apply(mapHandle(mono, t -> t.map2(mf)));
     }
 
+    public <U> Mono2<C, U> zmap(Function2<? super C, ? super V, ? extends U> mf) {
+        return apply(mapHandle(mono, t -> Tuple.of(t._1, mf.apply(t._1, t._2))));
+    }
+
     public <U> Mono2<C, U> mapM(Function1<? super V, Mono<@NonNull U>> mf) {
         return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).map(u -> Tuple.of(t._1, u)))));
     }
 
+    public <U> Mono2<C, U> zmapM(Function2<? super C, ? super V, Mono<@NonNull U>> mf) {
+        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).map(u -> Tuple.of(t._1, u)))));
+    }
+
     public <U> Mono2<C, U> mapF(Function1<? super V, ? extends CompletionStage<U>> mf) {
         return mapM(v -> Mono.fromFuture(mf.apply(v).toCompletableFuture()));
+    }
+
+    public <U> Mono2<C, U> zmapF(Function2<? super C , ? super V, ? extends CompletionStage<U>> mf) {
+        return zmapM((c, v) -> Mono.fromFuture(mf.apply(c, v).toCompletableFuture()));
     }
 
     private static <V> Mono<@NonNull V> tryIntoMono(Try<V> tv) {
@@ -329,6 +343,10 @@ public class Mono2<C, V> {
 
     public <U> Mono2<C, U> mapT(Function1<? super V, Try<U>> mf) {
         return mapM(v -> tryIntoMono(mf.apply(v)));
+    }
+
+    public <U> Mono2<C, U> zmapT(Function2<? super C, ? super V, Try<U>> mf) {
+        return zmapM((c,v) -> tryIntoMono(mf.apply(c, v)));
     }
 
     public <U> Mono2<C, U> flatMap(Function1<? super V, Mono2<C, U>> mf) {
@@ -464,20 +482,40 @@ public class Mono2<C, V> {
         return apply(mono.map(t -> Tuple.of(t._1, t._1)));
     }
 
+    public Mono2<C, Tuple2<C,V>> zgetC() {
+        return apply(mono.map(t -> Tuple.of(t._1, Tuple.of(t._1,t._2))));
+    }
+
     public <R> Mono2<C, R> getS(Function1<? super C, ? extends R> gf) {
         return getC().map(gf);
+    }
+
+    public <R> Mono2<C, Tuple2<R,V>> zgetS(Function1<? super C, ? extends R> gf) {
+        return zgetC().map(t -> t.map1(gf));
     }
 
     public <R> Mono2<C, R> getT(Function1<? super C, Try<R>> gf) {
         return getC().mapT(gf);
     }
 
+    public <R> Mono2<C, Tuple2<R,V>> zgetT(Function1<? super C, Try<R>> gf) {
+        return zgetC().mapT(t -> gf.apply(t._1).map(r -> Tuple.of(r,t._2)));
+    }
+
     public <R> Mono2<C, R> getM(Function1<? super C, Mono<@NonNull R>> gf) {
         return getC().mapM(gf);
     }
 
+    public <R> Mono2<C, Tuple2<R,V>> zgetM(Function1<? super C, Mono<@NonNull R>> gf) {
+        return zgetC().mapM(t -> gf.apply(t._1).map(r -> Tuple.of(r, t._2)));
+    }
+
     public <R> Mono2<C, R> getF(Function1<? super C, ? extends CompletionStage<R>> gf) {
         return getC().mapF(gf);
+    }
+
+    public <R> Mono2<C, Tuple2<R,V>> zgetF(Function1<? super C, ? extends CompletionStage<R>> gf) {
+        return zgetC().mapF(t -> gf.apply(t._1).thenApply(r -> Tuple.of(r, t._2)));
     }
 
     public <CO> Mono2<CO, V> modify(Function1<C, CO> onSuccess, Function2<C,Throwable,CO> onError) {

@@ -1,6 +1,7 @@
 package com.uangel.test.fp;
 
 import com.uangel.fp.Mono2;
+import com.uangel.fp.OptionalM2;
 import io.vavr.Tuple;
 import io.vavr.Tuple0;
 import io.vavr.control.Try;
@@ -8,12 +9,14 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.ExtensionMethod;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -29,6 +32,7 @@ class RecoverContext {
     String status;
 }
 
+@ExtensionMethod(OptionalM2.class)
 public class TestMono2 {
     @Test
     public void testMono2Recover() throws ExecutionException, InterruptedException {
@@ -263,20 +267,31 @@ public class TestMono2 {
         Assertions.assertEquals("D", deferred.context().block()._1);
     }
 
-//    @Test
-//    public void testFilterPreservesContextOnReject() {
-//        var rejected = Mono2.of("C", 1).filter(v -> v > 10);
-//        var ctx = rejected.context().block();
-//        Assertions.assertEquals("C", ctx._1);
-//        Assertions.assertEquals(NoSuchElementException.class, ctx._2.orElseThrow().getClass());
-//        Assertions.assertEquals(1, Mono2.of("C", 1).filter(v -> v > 0).value().block());
-//        Assertions.assertEquals(2, Mono2.of("C", 2).filter((c, v) -> c.equals("C")).value().block());
-//
+    @Test
+    public void testFilterPreservesContextOnReject() {
+        var rejected = Mono2.of("C", 1)
+            .map(Optional::of)
+            .subfilter(v -> v > 10)
+            .subget(() -> new NoSuchElementException("not found"));
+        var ctx = rejected.context().block();
+        Assertions.assertEquals("C", ctx._1);
+        Assertions.assertEquals(NoSuchElementException.class, ctx._2.orElseThrow().getClass());
+        Assertions.assertEquals(1, Mono2.of("C", 1)
+            .map(Optional::of)
+            .subfilter(v -> v > 0)
+            .subget("not found")
+            .value().block());
+        Assertions.assertEquals(2, Mono2.of("C", 2)
+            .map(Optional::of)
+            .subfilter((c, v) -> c.equals("C"))
+            .subget("not found")
+            .value().block());
+
 //        var whenRejected = Mono2.of("C", 1).filterWhen(v -> Mono.just(false));
-//        Assertions.assertEquals("C", whenRejected.context().block()._1);
-//        Assertions.assertEquals(NoSuchElementException.class, whenRejected.context().block()._2.orElseThrow().getClass());
-//        Assertions.assertEquals(3, Mono2.of("C", 3).filterWhen(v -> Mono.just(true)).value().block());
-//    }
+////        Assertions.assertEquals("C", whenRejected.context().block()._1);
+////        Assertions.assertEquals(NoSuchElementException.class, whenRejected.context().block()._2.orElseThrow().getClass());
+////        Assertions.assertEquals(3, Mono2.of("C", 3).filterWhen(v -> Mono.just(true)).value().block());
+    }
 
     @Test
     public void testZipWhenAndZipWith() {
