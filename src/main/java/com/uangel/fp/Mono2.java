@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /*
 name convention:
@@ -43,11 +44,12 @@ name convention:
  * @param <V> Value
  */
 public class Mono2<C, V> {
-    static class ExceptionWithContext extends Throwable {
+    static class ExceptionWithContext extends RuntimeException {
         private final Object context;
         final Throwable err;
 
         ExceptionWithContext(Object c, Throwable err) {
+            super(err);
             this.context = c;
             this.err = err;
         }
@@ -56,6 +58,31 @@ public class Mono2<C, V> {
         <T> T getContext() {
             return (T) context;
         }
+    }
+
+    private static Throwable wrap(Object context, Throwable err) {
+        return err instanceof ExceptionWithContext ? err : new ExceptionWithContext(context, err);
+    }
+
+    private static <T> Mono<@NonNull  T> attempt(Object context, Supplier<Mono<@NonNull T>> supplier) {
+        try {
+            return supplier.get().onErrorMap(err -> wrap(context, err));
+        } catch (Throwable e) {
+            return Mono.error(wrap(context, e));
+        }
+    }
+
+    private static <CI, VI, CO, UO> Mono<@NonNull Tuple2<CO, UO>> mapHandle(
+        Mono<@NonNull Tuple2<CI, VI>> source,
+        Function<Tuple2<CI, VI>, Tuple2<CO, UO>> mapper
+    ) {
+        return source.handle((t, sink) -> {
+            try {
+                sink.next(mapper.apply(t));
+            } catch (Throwable e) {
+                sink.error(wrap(t._1, e));
+            }
+        });
     }
 
     public final Mono<@NonNull  Tuple2<C, V>> mono;
@@ -69,7 +96,7 @@ public class Mono2<C, V> {
     }
 
     public static <C, V> Mono2<C, V> fromFuture(C c, CompletableFuture<V> future) {
-        return new Mono2<>(Mono.fromFuture(future).map(v -> Tuple.of(c, v)));
+        return new Mono2<>(attempt(c, () -> Mono.fromFuture(future).map(v -> Tuple.of(c, v))));
     }
 
     public static <C, V> Mono2<C, V> of(C c, V v) {
@@ -85,11 +112,11 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C,U> transform(Function2<C, V, Tuple2<C, U>> f) {
-        return apply(mono.map(t -> f.tupled().apply(t)));
+        return apply(mapHandle(mono, t -> f.tupled().apply(t)));
     }
 
     public <U> Mono2<C, U> transformM(Function2<C, V, Mono<@NonNull Tuple2<C, U>>> f) {
-        return apply(mono.flatMap(t -> f.tupled().apply(t).onErrorMap(err -> new ExceptionWithContext(t._1, err))));
+        return apply(mono.flatMap(t -> attempt(t._1, () -> f.tupled().apply(t))));
     }
 
     public <U> Mono2<C, U> transformF(Function2<C, V, CompletableFuture<Tuple2<C, U>>> f) {
@@ -107,16 +134,20 @@ public class Mono2<C, V> {
     public Mono2<C, V> mapError(Function2<C, Throwable, Throwable> mf) {
         return apply(mono.onErrorMap(err -> {
             if (err instanceof ExceptionWithContext ei) {
-                return new ExceptionWithContext(ei.getContext(), mf.apply(ei.getContext(), ei.err));
+                try {
+                    return new ExceptionWithContext(ei.getContext(), mf.apply(ei.getContext(), ei.err));
+                } catch (Throwable e) {
+                    return wrap(ei.getContext(), e);
+                }
             }
             return err;
         }));
     }
 
     public <CO, R> Mono2<CO, R> either(Function2<C, V, Tuple2<CO, R>> onSuccess, Function2<C, Throwable, Tuple2<CO, R>> onFailure) {
-        return apply(mono.map(t -> onSuccess.apply(t._1, t._2)).onErrorResume(err -> {
+        return apply(mapHandle(mono, t -> onSuccess.apply(t._1, t._2)).onErrorResume(err -> {
             if (err instanceof ExceptionWithContext ei) {
-                return Mono.just(onFailure.apply(ei.getContext(), ei.err));
+                return attempt(ei.getContext(), () -> Mono.just(onFailure.apply(ei.getContext(), ei.err)));
             }
             return Mono.error(err);
         }));
@@ -129,7 +160,7 @@ public class Mono2<C, V> {
     public Mono2<C, V> recoverM(Function2<C, Throwable, Mono<@NonNull Tuple2<C, V>>> rf) {
         return apply(mono.onErrorResume(err -> {
             if (err instanceof ExceptionWithContext ei) {
-                return rf.apply(ei.getContext(), ei.err);
+                return attempt(ei.getContext(), () -> rf.apply(ei.getContext(), ei.err));
             }
             return Mono.error(err);
         }));
@@ -198,11 +229,11 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C, U> map(Function1<V, U> mf) {
-        return apply(mono.map(t -> t.map2(mf)));
+        return apply(mapHandle(mono, t -> t.map2(mf)));
     }
 
     public <U> Mono2<C, U> mapM(Function1<V, Mono<@NonNull U>> mf) {
-        return apply(mono.flatMap(t -> mf.apply(t._2).onErrorMap(err -> new ExceptionWithContext(t._1, err)).map(u -> Tuple.of(t._1, u))));
+        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).map(u -> Tuple.of(t._1, u)))));
     }
 
     public <U> Mono2<C, U> mapF(Function1<V, CompletableFuture<U>> mf) {
@@ -218,17 +249,15 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C, U> flatMap(Function1<V, Mono2<C, U>> mf) {
-        return apply(mono.flatMap(t -> mf.apply(t._2).mono.onErrorMap(err -> new ExceptionWithContext(t._1, err))));
+        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).mono)));
     }
 
     public Mono2<C, Tuple0> putWith(Function2<C, V, C> wf) {
-        return apply(mono.map(t -> Tuple.of(wf.apply(t._1, t._2), Tuple0.instance())));
+        return apply(mapHandle(mono, t -> Tuple.of(wf.apply(t._1, t._2), Tuple0.instance())));
     }
 
-
-
     public Mono2<C, V> putSet(BiConsumer<C, V> wf) {
-        return apply(mono.map(t -> {
+        return apply(mapHandle(mono, t -> {
             wf.accept(t._1, t._2);
             return t;
         }));
@@ -255,23 +284,23 @@ public class Mono2<C, V> {
     }
 
     public <CO> Mono2<CO, V> modify(Function1<C, CO> onSuccess, Function2<C,Throwable,CO> onError) {
-        return apply(mono.map(t -> t.map1(onSuccess)).onErrorMap(err -> {
-            if (err instanceof ExceptionWithContext ei) {
-                var newc = onError.apply(ei.getContext(), ei.err);
-                return new ExceptionWithContext(newc, err);
-            }
-            return err;
-        }));
+        return apply(mapHandle(mono, t -> t.map1(onSuccess)).onErrorMap(err -> remapContext(err, onError)));
     }
 
     // V 혹은 error 를 이용해서 C 를 modify 하는 경우
     public <CO> Mono2<CO, Tuple0> modifyWith(Function2<C, V, CO> onSuccess, Function2<C,Throwable,CO> onError) {
-        return apply(mono.map(t -> Tuple.of(onSuccess.apply(t._1, t._2), Tuple0.instance())).onErrorMap(err -> {
-            if (err instanceof ExceptionWithContext ec) {
-                return new ExceptionWithContext(onError.apply(ec.getContext(), err), err);
+        return apply(mapHandle(mono, t -> Tuple.of(onSuccess.apply(t._1, t._2), Tuple0.instance())).onErrorMap(err -> remapContext(err, onError)));
+    }
+
+    private static <C, CO> Throwable remapContext(Throwable err, Function2<C, Throwable, CO> onError) {
+        if (err instanceof ExceptionWithContext ei) {
+            try {
+                return new ExceptionWithContext(onError.apply(ei.getContext(), ei.err), ei.err);
+            } catch (Throwable e) {
+                return wrap(ei.getContext(), e);
             }
-            return err;
-        }));
+        }
+        return err;
     }
 
     public <A, B> Mono2<C, Tuple2<A, B>> getS2(Function<C, A> g1, Function<C, B> g2) {
