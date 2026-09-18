@@ -8,6 +8,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -111,19 +112,19 @@ public class Mono2<C, V> {
         return apply(mono.cache());
     }
 
-    public <U> Mono2<C,U> transform(Function2<C, V, Tuple2<C, U>> f) {
-        return apply(mapHandle(mono, t -> f.tupled().apply(t)));
+    public <U> Mono2<C,U> transform(Function2<C, ? super V, Tuple2<C, U>> f) {
+        return apply(mapHandle(mono, t -> f.apply(t._1,t._2)));
     }
 
-    public <U> Mono2<C, U> transformM(Function2<C, V, Mono<@NonNull Tuple2<C, U>>> f) {
-        return apply(mono.flatMap(t -> attempt(t._1, () -> f.tupled().apply(t))));
+    public <U> Mono2<C, U> transformM(Function2<C, ? super V, Mono<@NonNull Tuple2<C, U>>> f) {
+        return apply(mono.flatMap(t -> attempt(t._1, () -> f.apply(t._1,t._2))));
     }
 
-    public <U> Mono2<C, U> transformF(Function2<C, V, CompletableFuture<Tuple2<C, U>>> f) {
+    public <U> Mono2<C, U> transformF(Function2<C, ? super V, CompletableFuture<Tuple2<C, U>>> f) {
         return transformM((c, v) -> Mono.fromFuture(f.apply(c, v)));
     }
 
-    public <U> Mono2<C, U> transformT(Function2<C, V, Try<Tuple2<C, U>>> f) {
+    public <U> Mono2<C, U> transformT(Function2<C, ? super V, Try<Tuple2<C, U>>> f) {
         return transformF((c, v) -> f.apply(c, v).toCompletableFuture());
     }
 
@@ -144,7 +145,7 @@ public class Mono2<C, V> {
         }));
     }
 
-    public <CO, R> Mono2<CO, R> either(Function2<C, V, Tuple2<CO, R>> onSuccess, Function2<C, Throwable, Tuple2<CO, R>> onFailure) {
+    public <CO, R> Mono2<CO, R> either(Function2<C, ? super V, Tuple2<CO, R>> onSuccess, Function2<C, Throwable, Tuple2<CO, R>> onFailure) {
         return apply(mapHandle(mono, t -> onSuccess.apply(t._1, t._2)).onErrorResume(err -> {
             if (err instanceof ExceptionWithContext ei) {
                 return attempt(ei.getContext(), () -> Mono.just(onFailure.apply(ei.getContext(), ei.err)));
@@ -153,7 +154,7 @@ public class Mono2<C, V> {
         }));
     }
 
-    public <R> Mono2<C, R> eitherM(Function2<C, V, Mono<@NonNull Tuple2<C, R>>> onSuccess, Function2<C, Throwable, Mono<@NonNull Tuple2<C, R>>> onFailure) {
+    public <R> Mono2<C, R> eitherM(Function2<C, ? super V, Mono<@NonNull Tuple2<C, R>>> onSuccess, Function2<C, Throwable, Mono<@NonNull Tuple2<C, R>>> onFailure) {
         return transformM(onSuccess).recoverM(onFailure);
     }
 
@@ -228,35 +229,35 @@ public class Mono2<C, V> {
         return mapT(v -> u);
     }
 
-    public <U> Mono2<C, U> map(Function1<V, U> mf) {
+    public <U> Mono2<C, U> map(Function1<? super V, ? extends U> mf) {
         return apply(mapHandle(mono, t -> t.map2(mf)));
     }
 
-    public <U> Mono2<C, U> mapM(Function1<V, Mono<@NonNull U>> mf) {
+    public <U> Mono2<C, U> mapM(Function1<? super V, Mono<@NonNull U>> mf) {
         return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).map(u -> Tuple.of(t._1, u)))));
     }
 
-    public <U> Mono2<C, U> mapF(Function1<V, CompletableFuture<U>> mf) {
-        return mapM(v -> Mono.fromFuture(mf.apply(v)));
+    public <U> Mono2<C, U> mapF(Function1<? super V, ? extends CompletionStage<U>> mf) {
+        return mapM(v -> Mono.fromFuture(mf.apply(v).toCompletableFuture()));
     }
 
     private static <V> Mono<@NonNull V> tryIntoMono(Try<V> tv) {
         return tv.fold(Mono::error, Mono::just);
     }
 
-    public <U> Mono2<C, U> mapT(Function1<V, Try<U>> mf) {
+    public <U> Mono2<C, U> mapT(Function1<? super V, Try<U>> mf) {
         return mapM(v -> tryIntoMono(mf.apply(v)));
     }
 
-    public <U> Mono2<C, U> flatMap(Function1<V, Mono2<C, U>> mf) {
+    public <U> Mono2<C, U> flatMap(Function1<? super V, Mono2<C, U>> mf) {
         return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).mono)));
     }
 
-    public Mono2<C, Tuple0> putWith(Function2<C, V, C> wf) {
+    public Mono2<C, Tuple0> putWith(Function2<C, ? super V, C> wf) {
         return apply(mapHandle(mono, t -> Tuple.of(wf.apply(t._1, t._2), Tuple0.instance())));
     }
 
-    public Mono2<C, V> putSet(BiConsumer<C, V> wf) {
+    public Mono2<C, V> putSet(BiConsumer<C, ? super V> wf) {
         return apply(mapHandle(mono, t -> {
             wf.accept(t._1, t._2);
             return t;
@@ -267,19 +268,19 @@ public class Mono2<C, V> {
         return apply(mono.map(t -> Tuple.of(t._1, t._1)));
     }
 
-    public <R> Mono2<C, R> getS(Function1<C, R> gf) {
+    public <R> Mono2<C, R> getS(Function1<? super C, ? extends R> gf) {
         return getC().map(gf);
     }
 
-    public <R> Mono2<C, R> getT(Function1<C, Try<R>> gf) {
+    public <R> Mono2<C, R> getT(Function1<? super C, Try<R>> gf) {
         return getC().mapT(gf);
     }
 
-    public <R> Mono2<C, R> getM(Function1<C, Mono<@NonNull R>> gf) {
+    public <R> Mono2<C, R> getM(Function1<? super C, Mono<@NonNull R>> gf) {
         return getC().mapM(gf);
     }
 
-    public <R> Mono2<C, R> getF(Function1<C, CompletableFuture<R>> gf) {
+    public <R> Mono2<C, R> getF(Function1<? super C, ? extends CompletionStage<R>> gf) {
         return getC().mapF(gf);
     }
 
@@ -288,7 +289,7 @@ public class Mono2<C, V> {
     }
 
     // V 혹은 error 를 이용해서 C 를 modify 하는 경우
-    public <CO> Mono2<CO, Tuple0> modifyWith(Function2<C, V, CO> onSuccess, Function2<C,Throwable,CO> onError) {
+    public <CO> Mono2<CO, Tuple0> modifyWith(Function2<C, ? super V, CO> onSuccess, Function2<C,Throwable,CO> onError) {
         return apply(mapHandle(mono, t -> Tuple.of(onSuccess.apply(t._1, t._2), Tuple0.instance())).onErrorMap(err -> remapContext(err, onError)));
     }
 
@@ -303,67 +304,67 @@ public class Mono2<C, V> {
         return err;
     }
 
-    public <A, B> Mono2<C, Tuple2<A, B>> getS2(Function<C, A> g1, Function<C, B> g2) {
+    public <A, B> Mono2<C, Tuple2<A, B>> getS2(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2) {
         return getS(c -> Tuple.of(g1.apply(c), g2.apply(c)));
     }
 
-    public <A, B, R> Mono2<C, R> getS2map(Function<C, A> g1, Function<C, B> g2, Function2<A, B, R> mf) {
-        return getS2(g1, g2).map(mf.tupled());
+    public <A, B, R> Mono2<C, R> getS2map(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2, Function2<? super A, ? super B, ? extends R> mf) {
+        return getS2(g1, g2).map(t -> mf.apply(t._1,t._2));
     }
 
-    public <A, B, R> Mono2<C, R> getS2mapM(Function<C, A> g1, Function<C, B> g2, Function2<A, B, Mono<@NonNull R>> mf) {
-        return getS2(g1, g2).mapM(mf.tupled());
+    public <A, B, R> Mono2<C, R> getS2mapM(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2, Function2<? super A, ? super B, Mono<@NonNull R>> mf) {
+        return getS2(g1, g2).mapM(t -> mf.apply(t._1, t._2));
     }
 
-    public <A, B, R> Mono2<C, R> getS2mapF(Function<C, A> g1, Function<C, B> g2, Function2<A, B, CompletableFuture<R>> mf) {
-        return getS2(g1, g2).mapF(mf.tupled());
+    public <A, B, R> Mono2<C, R> getS2mapF(Function<? super C, ? extends A> g1, Function<? super C, ? extends B> g2, Function2<? super A, ? super B, ? extends CompletionStage<R>> mf) {
+        return getS2(g1, g2).mapF(t -> mf.apply(t._1,t._2));
     }
 
-    public <A1, A2, A3> Mono2<C, Tuple3<A1, A2, A3>> getS3(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3) {
+    public <A1, A2, A3> Mono2<C, Tuple3<A1, A2, A3>> getS3(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3) {
         return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c)));
     }
 
-    public <A1, A2, A3, R> Mono2<C, R> getS3map(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function3<A1, A2, A3, R> mf) {
-        return getS3(g1, g2, g3).map(mf.tupled());
+    public <A1, A2, A3, R> Mono2<C, R> getS3map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function3<A1, A2, A3, R> mf) {
+        return getS3(g1, g2, g3).map(t -> mf.apply(t._1,t._2,t._3));
     }
 
-    public <A1, A2, A3, R> Mono2<C, R> getS3mapM(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function3<A1, A2, A3, Mono<@NonNull R>> mf) {
-        return getS3(g1, g2, g3).mapM(mf.tupled());
+    public <A1, A2, A3, R> Mono2<C, R> getS3mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function3<A1, A2, A3, Mono<@NonNull R>> mf) {
+        return getS3(g1, g2, g3).mapM(t -> mf.apply(t._1,t._2,t._3));
     }
 
-    public <A1, A2, A3, R> Mono2<C, R> getS3mapF(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function3<A1, A2, A3, CompletableFuture<R>> mf) {
-        return getS3(g1, g2, g3).mapF(mf.tupled());
+    public <A1, A2, A3, R> Mono2<C, R> getS3mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function3<A1, A2, A3, CompletableFuture<R>> mf) {
+        return getS3(g1, g2, g3).mapF(t -> mf.apply(t._1,t._2,t._3));
     }
 
-    public <A1, A2, A3, A4> Mono2<C, Tuple4<A1, A2, A3, A4>> getS4(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4) {
+    public <A1, A2, A3, A4> Mono2<C, Tuple4<A1, A2, A3, A4>> getS4(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4) {
         return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c), g4.apply(c)));
     }
 
-    public <A1, A2, A3, A4, R> Mono2<C, R> getS4map(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4, Function4<A1, A2, A3, A4, R> mf) {
-        return getS4(g1, g2, g3, g4).map(mf.tupled());
+    public <A1, A2, A3, A4, R> Mono2<C, R> getS4map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function4<? super A1, ? super A2,? super A3,? super A4, ? extends R> mf) {
+        return getS4(g1, g2, g3, g4).map(t -> mf.apply(t._1,t._2,t._3,t._4));
     }
 
-    public <A1, A2, A3, A4, R> Mono2<C, R> getS4mapM(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4, Function4<A1, A2, A3, A4, Mono<@NonNull R>> mf) {
-        return getS4(g1, g2, g3, g4).mapM(mf.tupled());
+    public <A1, A2, A3, A4, R> Mono2<C, R> getS4mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function4<? super A1, ? super A2,? super A3,? super A4, Mono<@NonNull R>> mf) {
+        return getS4(g1, g2, g3, g4).mapM(t -> mf.apply(t._1,t._2,t._3,t._4));
     }
 
-    public <A1, A2, A3, A4, R> Mono2<C, R> getS4mapF(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4, Function4<A1, A2, A3, A4, CompletableFuture<R>> mf) {
-        return getS4(g1, g2, g3, g4).mapF(mf.tupled());
+    public <A1, A2, A3, A4, R> Mono2<C, R> getS4mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function4<? super A1, ? super A2,? super A3,? super A4, ? extends CompletionStage<R>> mf) {
+        return getS4(g1, g2, g3, g4).mapF(t -> mf.apply(t._1,t._2,t._3,t._4));
     }
 
-    public <A1, A2, A3, A4, A5> Mono2<C, Tuple5<A1, A2, A3, A4, A5>> getS5(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4, Function<C, A5> g5) {
+    public <A1, A2, A3, A4, A5> Mono2<C, Tuple5<A1, A2, A3, A4, A5>> getS5(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5) {
         return getS(c -> Tuple.of(g1.apply(c), g2.apply(c), g3.apply(c), g4.apply(c), g5.apply(c)));
     }
 
-    public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5map(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4, Function<C, A5> g5, Function5<A1, A2, A3, A4, A5, R> mf) {
-        return getS5(g1, g2, g3, g4, g5).map(mf.tupled());
+    public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5map(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? extends R> mf) {
+        return getS5(g1, g2, g3, g4, g5).map(t -> mf.apply(t._1,t._2,t._3,t._4, t._5));
     }
 
-    public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5mapM(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4, Function<C, A5> g5, Function5<A1, A2, A3, A4, A5, Mono<@NonNull R>> mf) {
-        return getS5(g1, g2, g3, g4, g5).mapM(mf.tupled());
+    public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5mapM(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, Mono<@NonNull R>> mf) {
+        return getS5(g1, g2, g3, g4, g5).mapM(t -> mf.apply(t._1,t._2,t._3,t._4, t._5));
     }
 
-    public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5mapF(Function<C, A1> g1, Function<C, A2> g2, Function<C, A3> g3, Function<C, A4> g4, Function<C, A5> g5, Function5<A1, A2, A3, A4, A5, CompletableFuture<R>> mf) {
-        return getS5(g1, g2, g3, g4, g5).mapF(mf.tupled());
+    public <A1, A2, A3, A4, A5, R> Mono2<C, R> getS5mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function5<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? extends CompletionStage<R>> mf) {
+        return getS5(g1, g2, g3, g4, g5).mapF(t -> mf.apply(t._1,t._2,t._3,t._4, t._5));
     }
 }
