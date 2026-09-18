@@ -73,8 +73,8 @@ public class Mono2CodingStyleTest {
         Mono2<StyleContext, Tuple0> m4 = m3.getS2mapM(c -> c, StyleContext::getResult1, this::getResult2)
             .putWith(StyleContext::withResult2);
 
-        // 호출 하려는 함수가 C 만 필요하다면, getC 후에 map을 호출 하면 됩니다.
-        Mono2<StyleContext, Integer> m5 = m4.getC().mapM(this::sum);
+        // 호출 하려는 함수가 C 만 필요하다면, getM을 호출 하면 됩니다.
+        Mono2<StyleContext, Integer> m5 = m4.getM(this::sum);
 
         // 결과 값이 필요하면 eval 을, context 가 필요하면 exec 을, 둘다 필요하면 run을 호출 합니다.
         var sum = m5.eval().get();
@@ -86,7 +86,7 @@ public class Mono2CodingStyleTest {
             .putWith(StyleContext::withResult1)
             .getS2mapM(c -> c, StyleContext::getResult1, this::getResult2)
             .putWith(StyleContext::withResult2)
-            .getC().mapM(this::sum)
+            .getM(this::sum)
             .eval().get()
             ;
 
@@ -121,7 +121,7 @@ public class Mono2CodingStyleTest {
         ).putWith(StyleContext::withResult2);
 
         // context 가 필요하면 exec 을 호출 합니다.
-        var result = m3.getC().mapM(this::sum).putWith(StyleContext::withSum).exec().get();
+        var result = m3.getM(this::sum).putWith(StyleContext::withSum).exec().get();
         Assertions.assertEquals(51, result._1.getSum());
         // C 에 기록해둔 error 가 있어야 합니다.
         Assertions.assertEquals(NoSuchElementException.class, result._1.getErrorIndication().getClass());
@@ -136,7 +136,7 @@ public class Mono2CodingStyleTest {
             .putWith(StyleContext::withResult1)
             .getS2mapM(c -> c, StyleContext::getResult1, this::getResult2Fail)
             .putWith(StyleContext::withResult2).
-            getC().mapM(this::sum).putWith(StyleContext::withSum)
+            getM(this::sum).putWith(StyleContext::withSum)
             .exec();
 
         // C 를 가져오는 것은 실패 없이 항상 성공합니다.
