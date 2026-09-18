@@ -98,11 +98,10 @@ public class Mono2CodingStyleTest {
     public void codingStyleRecover() throws ExecutionException, InterruptedException {
         // 단일 Mono<V> 는 사용하다 보면 불편한 점이 많은데,
         // C가 Context 라고 하면
-        // Mono<C> 를 가지고 map 이나 flatMap 으로 계산하고 나면
-        // Mono<V> 로 바뀌면서 C 가 사라진다는 점이 제일 불편합니다.
-        // callback hell 이 발생할 수도 있는 것도 문제점입니다.
+        // Mono<C> 를 가지고 map 이나 flatMap 으로 C 를 유지하면서 코딩하더라도
+        // 에러가 발생하면 C 가 사라지고 Throwable 만 남는게 아주 불편합니다.
 
-        // Mono2<C,V> 는  C 를 유지하면서 V 에 대한 계산을 할 수 있어 편합니다.
+        // Mono2<C,V> 는  에러가 발생해도, 에러 직전 C를 보존합니다.
 
         // 아래 예제에서는 var 대신 explicit 타입으로 선언했는데, 실제로는 var 를 사용하고, chain 을 사용하여 불필요한 변수 선언이 없도록 합니다.
         // 처음에는 V가 빈 채로 생성됩니다.
