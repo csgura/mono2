@@ -13,8 +13,11 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import reactor.core.scheduler.Schedulers;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -238,6 +241,116 @@ public class TestMono2 {
         var transformedCtx = transformed.context().block();
         Assertions.assertEquals("T", transformedCtx._1);
         Assertions.assertEquals("transform", transformedCtx._2.orElseThrow().getMessage());
+    }
+
+    @Test
+    public void testFromAndDeferAndError() {
+        Assertions.assertEquals("x", Mono2.from("C", Mono.just("x")).value().block());
+        Assertions.assertEquals("call", Mono2.fromCallable("C", () -> "call").value().block());
+        Assertions.assertEquals("sup", Mono2.fromSupplier("C", () -> "sup").value().block());
+
+        var failed = Mono2.from("C", Mono.<String>error(new IOException("e")));
+        var ctx = failed.context().block();
+        Assertions.assertEquals("C", ctx._1);
+        Assertions.assertEquals(IOException.class, ctx._2.orElseThrow().getClass());
+
+        var err = Mono2.<String, String>error("E", new IllegalStateException("boom"));
+        Assertions.assertEquals("E", err.context().block()._1);
+        Assertions.assertEquals("boom", err.context().block()._2.orElseThrow().getMessage());
+
+        var deferred = Mono2.defer(() -> Mono2.of("D", "v"));
+        Assertions.assertEquals("v", deferred.value().block());
+        Assertions.assertEquals("D", deferred.context().block()._1);
+    }
+
+//    @Test
+//    public void testFilterPreservesContextOnReject() {
+//        var rejected = Mono2.of("C", 1).filter(v -> v > 10);
+//        var ctx = rejected.context().block();
+//        Assertions.assertEquals("C", ctx._1);
+//        Assertions.assertEquals(NoSuchElementException.class, ctx._2.orElseThrow().getClass());
+//        Assertions.assertEquals(1, Mono2.of("C", 1).filter(v -> v > 0).value().block());
+//        Assertions.assertEquals(2, Mono2.of("C", 2).filter((c, v) -> c.equals("C")).value().block());
+//
+//        var whenRejected = Mono2.of("C", 1).filterWhen(v -> Mono.just(false));
+//        Assertions.assertEquals("C", whenRejected.context().block()._1);
+//        Assertions.assertEquals(NoSuchElementException.class, whenRejected.context().block()._2.orElseThrow().getClass());
+//        Assertions.assertEquals(3, Mono2.of("C", 3).filterWhen(v -> Mono.just(true)).value().block());
+//    }
+
+    @Test
+    public void testZipWhenAndZipWith() {
+        Assertions.assertEquals(Tuple.of(2, 6),
+            Mono2.of("C", 2).zipWhen(v -> Mono.just(v * 3)).value().block());
+        Assertions.assertEquals(8,
+            Mono2.of("C", 2).zipWhen(v -> Mono.just(v * 3), (a, b) -> a + b).value().block());
+        Assertions.assertEquals(Tuple.of("a", "b"),
+            Mono2.of("C", "a").zipWith(Mono.just("b")).value().block());
+        Assertions.assertEquals(Tuple.of("a", "b"),
+            Mono2.of("C1", "a").zipWith(Mono2.of("C2", "b")).value().block());
+
+        var failed = Mono2.of("C", 1).zipWhen(v -> Mono.<Integer>error(new IOException("z")));
+        Assertions.assertEquals("C", failed.context().block()._1);
+        Assertions.assertEquals(IOException.class, failed.context().block()._2.orElseThrow().getClass());
+    }
+
+    @Test
+    public void testDoOnNextAndDoOnError() {
+        var seenV = new AtomicReference<Integer>();
+        var seenC = new AtomicReference<String>();
+        Assertions.assertEquals(1, Mono2.of("C", 1).doOnNext(v -> seenV.set(v)).doOnNext((c, v) -> seenC.set(c)).value().block());
+        Assertions.assertEquals(1, seenV.get());
+        Assertions.assertEquals("C", seenC.get());
+
+        var seenErrC = new AtomicReference<String>();
+        var seenErr = new AtomicReference<Throwable>();
+        Mono2.of("C", 1)
+            .mapT(v -> Try.<Integer>failure(new IOException("e")))
+            .doOnError((c, err) -> {
+                seenErrC.set(c);
+                seenErr.set(err);
+            })
+            .recover((c, err) -> Tuple.of(c, 0))
+            .value().block();
+        Assertions.assertEquals("C", seenErrC.get());
+        Assertions.assertEquals(IOException.class, seenErr.get().getClass());
+    }
+
+    @Test
+    public void testTypedRecoverRetryThenCast() {
+        var recovered = Mono2.of("C", 1)
+            .mapT(v -> Try.<Integer>failure(new IOException("io")))
+            .recover(IOException.class, (c, err) -> Tuple.of(c, 9));
+        Assertions.assertEquals(9, recovered.value().block());
+
+        var notRecovered = Mono2.of("C", 1)
+            .mapT(v -> Try.<Integer>failure(new IllegalStateException("no")))
+            .recover(IOException.class, (c, err) -> Tuple.of(c, 9));
+        Assertions.assertEquals(IllegalStateException.class, notRecovered.context().block()._2.orElseThrow().getClass());
+
+        var mapped = Mono2.of("C", 1)
+            .mapT(v -> Try.<Integer>failure(new IOException("io")))
+            .mapError(IOException.class, (c, err) -> new IllegalStateException("mapped"));
+        Assertions.assertEquals(IllegalStateException.class, mapped.context().block()._2.orElseThrow().getClass());
+
+        var n = new AtomicInteger();
+        var retried = Mono2.defer(() -> {
+            if (n.incrementAndGet() < 3) {
+                return Mono2.<String, Integer>error("C", new IOException("again"));
+            }
+            return Mono2.of("C", n.get());
+        }).retry(2);
+        Assertions.assertEquals(3, retried.value().block());
+
+        Assertions.assertEquals("x", Mono2.of("C", (Object) "x").cast(String.class).value().block());
+        Assertions.assertEquals("x", Mono2.of("C", (Object) "x").ofType(String.class).value().block());
+        var ofTypeMiss = Mono2.of("C", (Object) 1).ofType(String.class);
+        Assertions.assertEquals(NoSuchElementException.class, ofTypeMiss.context().block()._2.orElseThrow().getClass());
+
+        Assertions.assertEquals("next", Mono2.of("C", "prev").then(Mono2.of("C", "next")).value().block());
+        Assertions.assertEquals(1, Mono2.of("C", 1).delayUntil(v -> Mono.empty()).value().block());
+        Assertions.assertEquals(1, Mono2.of("C", 1).subscribeOn(Schedulers.immediate()).value().block());
+        Assertions.assertTrue(Mono2.of("C", 1).elapsed().value().block()._1 >= 0);
     }
 
     @Test

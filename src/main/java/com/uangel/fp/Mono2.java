@@ -4,13 +4,22 @@ package com.uangel.fp;
 import io.vavr.*;
 import io.vavr.control.Try;
 import org.jspecify.annotations.NonNull;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
+import reactor.core.scheduler.Scheduler;
+import reactor.util.retry.Retry;
 
+import java.time.Duration;
+import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /*
@@ -97,7 +106,27 @@ public class Mono2<C, V> {
     }
 
     public static <C, V> Mono2<C, V> fromFuture(C c, CompletableFuture<V> future) {
-        return new Mono2<>(attempt(c, () -> Mono.fromFuture(future).map(v -> Tuple.of(c, v))));
+        return from(c, Mono.fromFuture(future));
+    }
+
+    public static <C, V> Mono2<C, V> from(C c, Mono<@NonNull V> source) {
+        return new Mono2<>(attempt(c, () -> source.map(v -> Tuple.of(c, v))));
+    }
+
+    public static <C, V> Mono2<C, V> fromCallable(C c, Callable<V> callable) {
+        return from(c, Mono.fromCallable(callable));
+    }
+
+    public static <C, V> Mono2<C, V> fromSupplier(C c, Supplier<V> supplier) {
+        return from(c, Mono.fromSupplier(supplier));
+    }
+
+    public static <C, V> Mono2<C, V> defer(Supplier<Mono2<C, V>> supplier) {
+        return apply(Mono.defer(() -> supplier.get().mono));
+    }
+
+    public static <C, V> Mono2<C, V> error(C c, Throwable err) {
+        return new Mono2<>(Mono.error(wrap(c, err)));
     }
 
     public static <C, V> Mono2<C, V> of(C c, V v) {
@@ -110,6 +139,34 @@ public class Mono2<C, V> {
 
     public Mono2<C, V> cache() {
         return apply(mono.cache());
+    }
+
+    public Mono2<C, V> cache(Duration ttl) {
+        return apply(mono.cache(ttl));
+    }
+
+    public Mono2<C, V> share() {
+        return apply(mono.share());
+    }
+
+    public Mono2<C, V> subscribeOn(Scheduler scheduler) {
+        return apply(mono.subscribeOn(scheduler));
+    }
+
+    public Mono2<C, V> publishOn(Scheduler scheduler) {
+        return apply(mono.publishOn(scheduler));
+    }
+
+    public Mono2<C, V> checkpoint(String description) {
+        return apply(mono.checkpoint(description));
+    }
+
+    public Mono2<C, V> log() {
+        return apply(mono.log());
+    }
+
+    public Mono2<C, V> log(String category) {
+        return apply(mono.log(category));
     }
 
     public <U> Mono2<C,U> transform(Function2<C, ? super V, Tuple2<C, U>> f) {
@@ -173,6 +230,31 @@ public class Mono2<C, V> {
 
     public Mono2<C, V> recoverT(Function2<C, Throwable, Try<Tuple2<C, V>>> rf) {
         return recoverF((c, err) -> rf.apply(c, err).toCompletableFuture());
+    }
+
+    public <E extends Throwable> Mono2<C, V> recover(Class<E> type, Function2<C, E, Tuple2<C, V>> rf) {
+        return recoverM((c, err) -> {
+            if (type.isInstance(err)) {
+                return Mono.just(rf.apply(c, type.cast(err)));
+            }
+            return Mono.error(wrap(c, err));
+        });
+    }
+
+    public <E extends Throwable> Mono2<C, V> mapError(Class<E> type, Function2<C, E, Throwable> mf) {
+        return mapError((c, err) -> type.isInstance(err) ? mf.apply(c, type.cast(err)) : err);
+    }
+
+    public Mono2<C, V> retry() {
+        return apply(mono.retry());
+    }
+
+    public Mono2<C, V> retry(long numRetries) {
+        return apply(mono.retry(numRetries));
+    }
+
+    public Mono2<C, V> retryWhen(Retry retry) {
+        return apply(mono.retryWhen(retry));
     }
 
     public Mono<@NonNull Tuple2<C, Optional<Throwable>>> context() {
@@ -251,6 +333,120 @@ public class Mono2<C, V> {
 
     public <U> Mono2<C, U> flatMap(Function1<? super V, Mono2<C, U>> mf) {
         return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).mono)));
+    }
+
+    public <U> Mono2<C, U> then(Mono2<C, U> next) {
+        return apply(mono.flatMap(t -> attempt(t._1, () -> next.mono)));
+    }
+    // filter 는 Mono2 와 안 맞는듯
+    private Mono2<C, V> filter(Predicate<? super V> pred) {
+        return filter((c, v) -> pred.test(v));
+    }
+
+    private Mono2<C, V> filter(Function2<C, ? super V, Boolean> pred) {
+        return apply(mapHandle(mono, t -> {
+            if (Boolean.TRUE.equals(pred.apply(t._1, t._2))) {
+                return t;
+            }
+            throw new NoSuchElementException("filter");
+        }));
+    }
+//
+//    public Mono2<C, V> filterWhen(Function1<? super V, Mono<Boolean>> pred) {
+//        return filterWhen((c, v) -> pred.apply(v));
+//    }
+//
+//    public Mono2<C, V> filterWhen(Function2<C, ? super V, Mono<Boolean>> pred) {
+//        return apply(mono.flatMap(t -> attempt(t._1, () -> pred.apply(t._1, t._2).flatMap(pass ->
+//            Boolean.TRUE.equals(pass) ? Mono.just(t) : Mono.error(new NoSuchElementException("filterWhen"))
+//        ))));
+//    }
+//
+
+    public <U> Mono2<C, Tuple2<V, U>> zipWhen(Function1<? super V, Mono<@NonNull U>> other) {
+        return zipWhen((c, v) -> other.apply(v));
+    }
+
+    public <U> Mono2<C, Tuple2<V, U>> zipWhen(Function2<C, ? super V, Mono<@NonNull U>> other) {
+        return apply(mono.flatMap(t -> attempt(t._1, () ->
+            other.apply(t._1, t._2).map(u -> Tuple.of(t._1, Tuple.of(t._2, u)))
+        )));
+    }
+
+    public <U, R> Mono2<C, R> zipWhen(Function1<? super V, Mono<@NonNull U>> other, Function2<? super V, ? super U, ? extends R> combinator) {
+        return zipWhen(other).map(t -> combinator.apply(t._1, t._2));
+    }
+
+    public <U> Mono2<C, Tuple2<V, U>> zipWith(Mono<@NonNull U> other) {
+        return zipWhen(v -> other);
+    }
+
+    public <U> Mono2<C, Tuple2<V, U>> zipWith(Mono2<?, U> other) {
+        return zipWhen(v -> other.value());
+    }
+
+    public <U, R> Mono2<C, R> zipWith(Mono<@NonNull U> other, Function2<? super V, ? super U, ? extends R> combinator) {
+        return zipWhen(v -> other, combinator);
+    }
+
+    public Mono2<C, V> delayUntil(Function1<? super V, ? extends Publisher<?>> other) {
+        return delayUntil((c, v) -> other.apply(v));
+    }
+
+    public Mono2<C, V> delayUntil(Function2<C, ? super V, ? extends Publisher<?>> other) {
+        return apply(mono.flatMap(t -> attempt(t._1, () ->
+            Mono.just(t).delayUntil(x -> other.apply(x._1, x._2))
+        )));
+    }
+
+    public Mono2<C, V> delayElement(Duration delay) {
+        return apply(mono.delayElement(delay));
+    }
+
+    public <U> Mono2<C, U> cast(Class<U> type) {
+        return map(type::cast);
+    }
+
+    public <U> Mono2<C, U> ofType(Class<U> type) {
+        return filter(type::isInstance).cast(type);
+    }
+
+    public Mono2<C, Tuple2<Long, V>> elapsed() {
+        return apply(mono.elapsed().map(t -> {
+            var cv = t.getT2();
+            return Tuple.of(cv._1, Tuple.of(t.getT1(), cv._2));
+        }));
+    }
+
+    public Mono2<C, V> doOnNext(Consumer<? super V> consumer) {
+        return doOnNext((c, v) -> consumer.accept(v));
+    }
+
+    public Mono2<C, V> doOnNext(BiConsumer<? super C, ? super V> consumer) {
+        return apply(mapHandle(mono, t -> {
+            consumer.accept(t._1, t._2);
+            return t;
+        }));
+    }
+
+    public Mono2<C, V> doOnError(Consumer<? super Throwable> consumer) {
+        return doOnError((c, err) -> consumer.accept(err));
+    }
+
+    public Mono2<C, V> doOnError(BiConsumer<? super C, ? super Throwable> consumer) {
+        return apply(mono.doOnError(err -> {
+            if (err instanceof ExceptionWithContext ei) {
+                consumer.accept(ei.getContext(), ei.err);
+            }
+        }));
+    }
+
+    public Mono2<C, V> doFinally(Consumer<SignalType> onFinally) {
+        return apply(mono.doFinally(onFinally));
+    }
+
+    public Mono2<C, V> doOnCancel(Runnable onCancel) {
+        return apply(mono.doOnCancel(onCancel));
     }
 
     public Mono2<C, Tuple0> putWith(Function2<C, ? super V, C> wf) {
