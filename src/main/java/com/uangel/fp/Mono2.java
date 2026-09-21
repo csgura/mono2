@@ -48,6 +48,10 @@ name convention:
  C 의 타입을 변경할 수 없다. ExceptionWithContext 의 type casting 이 안전하지 않기 때문
  C의 타입을 변경할 수 있는 경우는 , 성공인 경우와 실패인 경우에 대해 모두 callback을 제공하는 either 와 modify 뿐이다.
  eitherM 의 경우 실패할 수 있으므로 C의 타입을 변경하는 것은 불가능하다.
+
+
+ timeout 은 지원하지 않음.  timeout 이 필요할 경우에
+ m.mapM(v -> doSomething().timeout(Duration.ofSeconds(3))) 과 같이  mapM 안의 Mono  에서 지정할 것
  */
 
 /**
@@ -362,6 +366,11 @@ public class Mono2<C, V> {
     public <U> Mono2<C, U> then(Mono2<C, U> next) {
         return apply(mono.flatMap(t -> attempt(t._1, () -> next.mono)));
     }
+
+    public <U> Mono2<C, U> then(Function<C, Mono2<C, U>> next) {
+        return zflatMap((c, x) -> next.apply(c));
+    }
+
     // filter 는 Mono2 와 안 맞는듯
     private Mono2<C, V> filter(Predicate<? super V> pred) {
         return filter((c, v) -> pred.test(v));
