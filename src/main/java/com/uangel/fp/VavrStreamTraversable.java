@@ -44,7 +44,7 @@ public class VavrStreamTraversable {
         if(stream.isEmpty()){
             return CompletableFuture.completedFuture(Stream.empty());
         }
-        return f.apply( stream.head()).flatMap(head -> traverseF(stream.tail(), f));
+        return f.apply( stream.head()).flatMap(head -> traverseF(stream.tail(), f).map(tail -> tail.prepend(head)));
     }
 
     public static <T,U> CompletableFuture<Stream<U>> ptraverseF(Stream<T> stream, int numParallel, Function<T,CompletableFuture<U>> f) {
@@ -61,7 +61,7 @@ public class VavrStreamTraversable {
         if(stream.isEmpty()){
             return Mono.just(Stream.empty());
         }
-        return f.apply( stream.head()).flatMap(head -> traverseM(stream.tail(), f));
+        return f.apply( stream.head()).flatMap(head -> traverseM(stream.tail(), f).map(tail -> tail.prepend(head)));
     }
 
     public static <T,U> Mono<Stream<U>> ptraverseM(Stream<T> stream, int numParallel, Function<T,Mono<U>> f) {
