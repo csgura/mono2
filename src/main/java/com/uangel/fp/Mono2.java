@@ -349,8 +349,14 @@ public class Mono2<C, V> {
         return zmapM((c,v) -> tryIntoMono(mf.apply(c, v)));
     }
 
+    // C 가 빠져 있어서,  haskell의 bind 에 해당하지는 않음.
     public <U> Mono2<C, U> flatMap(Function1<? super V, Mono2<C, U>> mf) {
         return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).mono)));
+    }
+
+    // c가 포함된 z 버젼이 haskell의 bind 에 해당
+    public <U> Mono2<C, U> zflatMap(Function2<?super C, ? super V, Mono2<C, U>> mf) {
+        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).mono)));
     }
 
     public <U> Mono2<C, U> then(Mono2<C, U> next) {

@@ -1,9 +1,11 @@
 package com.uangel.test.fp;
 
+import com.uangel.fp.ListTraversable;
 import com.uangel.fp.Mono2;
 import com.uangel.fp.OptionalM2;
 import io.vavr.Tuple;
 import io.vavr.Tuple0;
+import io.vavr.collection.List;
 import io.vavr.control.Try;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -32,7 +34,7 @@ class RecoverContext {
     String status;
 }
 
-@ExtensionMethod(OptionalM2.class)
+@ExtensionMethod(value = {OptionalM2.class, ListTraversable.class})
 public class TestMono2 {
     @Test
     public void testMono2Recover() throws ExecutionException, InterruptedException {
@@ -440,5 +442,16 @@ public class TestMono2 {
             cur = cur.getCause();
         }
         return cur;
+    }
+
+    @Test
+    public void testTraverse() throws ExecutionException, InterruptedException {
+        var list = List.of(1,2,3).traverseM2("", (s, v) -> {
+           return Mono2.fromCallable(s , v::toString);
+        }).eval().get();
+
+        Assertions.assertEquals(3, list.size());
+
+        Assertions.assertEquals("1", list.get(0));
     }
 }
