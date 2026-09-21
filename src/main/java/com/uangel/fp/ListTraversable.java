@@ -74,4 +74,21 @@ public class ListTraversable {
     public static <T,U> CompletableFuture<java.util.List<U>> ptraverseF(java.util.List<T> list,  int numParallel , Function<T,CompletableFuture<U>> f) {
         return Stream.ofAll(list).ptraverseF(numParallel,f).map(Value::toJavaList);
     }
+
+    public static <A,T> CompletableFuture<A> foldlF(List<T> list, A zero, Function2<A,T,CompletableFuture<A>> foldF) {
+        return Stream.ofAll(list).foldlF(zero,foldF);
+    }
+
+    public static <A,T> CompletableFuture<A> foldlF(java.util.List<T> list, A zero, Function2<A,T,CompletableFuture<A>> foldF) {
+        return Stream.ofAll(list).foldlF(zero,foldF);
+    }
+
+    public static <A,T> Mono<A> foldlM(List<T> list, A zero, Function2<A,T,Mono<A>> foldF) {
+        return Stream.ofAll(list).foldlM(zero,foldF);
+    }
+
+    public static <A,T> Mono<A> foldlM(java.util.List<T> list, A zero, Function2<A,T,Mono<A>> foldF) {
+        return Stream.ofAll(list).foldlM(zero,foldF);
+    }
+
 }

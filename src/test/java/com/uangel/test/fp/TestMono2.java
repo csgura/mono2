@@ -467,5 +467,8 @@ public class TestMono2 {
         })).get();
 
         Assertions.assertTrue(ilist.zipAll(result, 0, 0 ).forAll(t -> Objects.equals(t._1, t._2)));
+
+        var sum = ilist.foldlF(0, (a , i ) ->  CompletableFuture.supplyAsync(() -> a + i )).get();
+        Assertions.assertEquals(4950, (int) sum);
     }
 }

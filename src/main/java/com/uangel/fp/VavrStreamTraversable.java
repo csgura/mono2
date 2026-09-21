@@ -75,4 +75,18 @@ public class VavrStreamTraversable {
         }
         return traverseM(stream , f);
     }
+
+    public static <A,T> CompletableFuture<A> foldlF(Stream<T> stream, A zero, Function2<A,T,CompletableFuture<A>> foldF) {
+        if(stream.isEmpty()){
+            return CompletableFuture.completedFuture(zero);
+        }
+        return foldF.apply(zero, stream.head()).flatMap(a -> foldlF(stream.tail(), a, foldF));
+    }
+
+    public static <A,T> Mono<A> foldlM(Stream<T> stream, A zero, Function2<A,T,Mono<A>> foldF) {
+        if(stream.isEmpty()){
+            return Mono.just(zero);
+        }
+        return foldF.apply(zero, stream.head()).flatMap(a -> foldlM(stream.tail(), a, foldF));
+    }
 }
