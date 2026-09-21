@@ -6,6 +6,7 @@ import com.uangel.fp.OptionalM2;
 import io.vavr.Tuple;
 import io.vavr.Tuple0;
 import io.vavr.collection.List;
+import io.vavr.collection.Stream;
 import io.vavr.control.Try;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -17,8 +18,7 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -453,5 +453,19 @@ public class TestMono2 {
         Assertions.assertEquals(3, list.size());
 
         Assertions.assertEquals("1", list.get(0));
+
+
+        var ilist = Stream.range(0,100).toList();
+
+        var result = ilist.ptraverseF(16,i -> CompletableFuture.supplyAsync(() -> {
+            try {
+                Thread.sleep(new Random().nextInt(100));
+            } catch (InterruptedException e) {
+
+            }
+            return i;
+        })).get();
+
+        Assertions.assertTrue(ilist.zipAll(result, 0, 0 ).forAll(t -> Objects.equals(t._1, t._2)));
     }
 }

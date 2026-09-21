@@ -22,7 +22,7 @@ public class VavrStreamTraversable {
         }
 
         var sub = list.tail();
-        return f.apply(c,  list.get(0))
+        return f.apply(c,  list.head())
             .zflatMap(
                 (nc, head) ->
                     traverseM2(sub, nc,  f)
@@ -44,7 +44,8 @@ public class VavrStreamTraversable {
         if(stream.isEmpty()){
             return CompletableFuture.completedFuture(Stream.empty());
         }
-        return f.apply( stream.head()).flatMap(head -> traverseF(stream.tail(), f).map(tail -> tail.prepend(head)));
+        return f.apply( stream.head()).flatMap(head -> traverseF(stream.tail(), f)
+            .map(tail -> tail.prepend(head)));
     }
 
     public static <T,U> CompletableFuture<Stream<U>> ptraverseF(Stream<T> stream, int numParallel, Function<T,CompletableFuture<U>> f) {
