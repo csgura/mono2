@@ -273,19 +273,19 @@ public class TestMono2 {
     public void testFilterPreservesContextOnReject() {
         var rejected = Mono2.of("C", 1)
             .map(Optional::of)
-            .subfilter(v -> v > 10)
+            .filter(v -> v > 10)
             .subget(() -> new NoSuchElementException("not found"));
         var ctx = rejected.context().block();
         Assertions.assertEquals("C", ctx._1);
         Assertions.assertEquals(NoSuchElementException.class, ctx._2.orElseThrow().getClass());
         Assertions.assertEquals(1, Mono2.of("C", 1)
             .map(Optional::of)
-            .subfilter(v -> v > 0)
+            .filter(v -> v > 0)
             .subget("not found")
             .value().block());
         Assertions.assertEquals(2, Mono2.of("C", 2)
             .map(Optional::of)
-            .subfilter((c, v) -> c.equals("C"))
+            .filter((c, v) -> c.equals("C"))
             .subget("not found")
             .value().block());
 
