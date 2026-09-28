@@ -22,6 +22,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -478,6 +480,13 @@ public class TestMono2 {
             return i;
         }).subscribeOn(Schedulers.newSingle("s1"));
     }
+
+    public Mono2<RecoverContext, Integer> dbMono2(RecoverContext c, String s) {
+        return Mono2.contextOf(c).map(t -> {
+            System.out.printf("dbMono2 thread = %s\n", Thread.currentThread().getName());
+            return 10;
+        }).subscribeOn(Schedulers.newSingle("s2"));
+    }
     @Test
     public void testScheduler() {
         var s1 = Schedulers.newParallel("p1");
@@ -493,6 +502,9 @@ public class TestMono2 {
             }).mapM(this::dbMono)
             .map(i -> {
                 System.out.printf("after dbMono thread = %s\n", Thread.currentThread().getName());
+                return Thread.currentThread().getName();
+            }).zflatMap(this::dbMono2).map(i -> {
+                System.out.printf("after dbMono2 thread = %s\n", Thread.currentThread().getName());
                 return Thread.currentThread().getName();
             })
         ;

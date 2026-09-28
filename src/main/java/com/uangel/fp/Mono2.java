@@ -63,9 +63,11 @@ name convention:
  */
 public class Mono2<C, V> {
 
+    private final Env env;
     private final Mono<@NonNull  Tuple2<C, V>> mono;
 
-    private Mono2(Mono<@NonNull Tuple2<C, V>> mono) {
+    private Mono2(Env env, Mono<@NonNull Tuple2<C, V>> mono) {
+        this.env = env;
         this.mono = mono;
     }
 
@@ -95,8 +97,8 @@ public class Mono2<C, V> {
     }
 
 
-    private static <C, V> Mono2<C, V> apply(Mono<@NonNull Tuple2<C, V>> mono) {
-        return new Mono2<>(mono);
+    private static <C, V> Mono2<C, V> apply(Env env, Mono<@NonNull Tuple2<C, V>> mono) {
+        return new Mono2<>(env, mono);
     }
 
     public static <C, V> Mono2<C, V> fromFuture(C c, CompletableFuture<V> future) {
@@ -104,7 +106,7 @@ public class Mono2<C, V> {
     }
 
     public static <C, V> Mono2<C, V> from(C c, Mono<@NonNull V> source) {
-        return new Mono2<>(attempt(c, () -> source.map(v -> Tuple.of(c, v))));
+        return apply(Env.subscribedOnCallerThread, attempt(c, () -> source.map(v -> Tuple.of(c, v))));
     }
 
     public static <C, V> Mono2<C, V> fromCallable(C c, Callable<V> callable) {
@@ -116,59 +118,67 @@ public class Mono2<C, V> {
     }
 
     public static <C, V> Mono2<C, V> defer(Supplier<Mono2<C, V>> supplier) {
-        return apply(Mono.defer(() -> supplier.get().mono));
+        return apply(Env.subscribedOnCallerThread, Mono.defer(() -> supplier.get().mono));
     }
 
     public static <C, V> Mono2<C, V> error(C c, Throwable err) {
-        return new Mono2<>(Mono.error(wrap(c, err)));
+        return apply(Env.subscribedOnCallerThread, Mono.error(wrap(c, err)));
     }
 
     public static <C, V> Mono2<C, V> of(C c, V v) {
-        return new Mono2<>(Mono.just(Tuple.of(c, v)));
+        return apply(Env.subscribedOnCallerThread, Mono.just(Tuple.of(c, v)));
     }
 
     public static <C> Mono2<C, Tuple0> contextOf(C c) {
         return of(c, Tuple0.instance());
     }
 
+    private <NC,NV> Mono2<NC,NV> replace2(Mono<@NonNull  Tuple2<NC,NV>> tp) {
+        return apply(env, tp);
+    }
+
+    private <NC,NV> Mono2<NC,NV> keepSched(Mono<@NonNull  Tuple2<NC,NV>> tp) {
+        return apply(env, env.sched().map(tp::publishOn).orElse(tp));
+    }
+
     public Mono2<C, V> cache() {
-        return apply(mono.cache());
+        return replace2(mono.cache());
     }
 
     public Mono2<C, V> cache(Duration ttl) {
-        return apply(mono.cache(ttl));
+        return replace2(mono.cache(ttl));
     }
 
     public Mono2<C, V> share() {
-        return apply(mono.share());
+        return replace2(mono.share());
     }
 
-    public Mono2<C, V> subscribeOn(Scheduler scheduler) {
-        return apply(mono.subscribeOn(scheduler));
+    public Mono2<C, V> subscribeOn(@NonNull Scheduler scheduler) {
+        return apply(new Env(Optional.of(scheduler)), mono.subscribeOn(scheduler));
     }
 
-    public Mono2<C, V> publishOn(Scheduler scheduler) {
-        return apply(mono.publishOn(scheduler));
+    public Mono2<C, V> publishOn(@NonNull Scheduler scheduler) {
+        return apply(new Env(Optional.of(scheduler)), mono.publishOn(scheduler));
     }
 
     public Mono2<C, V> checkpoint(String description) {
-        return apply(mono.checkpoint(description));
+        return replace2(mono.checkpoint(description));
     }
 
     public Mono2<C, V> log() {
-        return apply(mono.log());
+        return replace2(mono.log());
     }
 
     public Mono2<C, V> log(String category) {
-        return apply(mono.log(category));
+        return replace2(mono.log(category));
     }
 
     public <U> Mono2<C,U> transform(Function2<C, ? super V, Tuple2<C, U>> f) {
-        return apply(mapHandle(mono, t -> f.apply(t._1,t._2)));
+        return replace2(mapHandle(mono, t -> f.apply(t._1,t._2)));
     }
 
     public <U> Mono2<C, U> transformM(Function2<C, ? super V, Mono<@NonNull Tuple2<C, U>>> f) {
-        return apply(mono.flatMap(t -> attempt(t._1, () -> f.apply(t._1,t._2))));
+        return keepSched(mono.flatMap(t -> attempt(t._1, () -> f.apply(t._1,t._2))));
     }
 
     public <U> Mono2<C, U> transformF(Function2<C, ? super V, CompletableFuture<Tuple2<C, U>>> f) {
@@ -184,7 +194,7 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> mapError(Function2<C, Throwable, Throwable> mf) {
-        return apply(mono.onErrorMap(err -> {
+        return replace2(mono.onErrorMap(err -> {
             if (err instanceof ExceptionWithContext ei) {
                 try {
                     return new ExceptionWithContext(ei.getContext(), mf.apply(ei.getContext(), ei.err));
@@ -197,7 +207,7 @@ public class Mono2<C, V> {
     }
 
     public <CO, R> Mono2<CO, R> either(Function2<C, ? super V, Tuple2<CO, R>> onSuccess, Function2<C, Throwable, Tuple2<CO, R>> onFailure) {
-        return apply(mapHandle(mono, t -> onSuccess.apply(t._1, t._2)).onErrorResume(err -> {
+        return replace2(mapHandle(mono, t -> onSuccess.apply(t._1, t._2)).onErrorResume(err -> {
             if (err instanceof ExceptionWithContext ei) {
                 return attempt(ei.getContext(), () -> Mono.just(onFailure.apply(ei.getContext(), ei.err)));
             }
@@ -210,7 +220,7 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> recoverM(Function2<C, Throwable, Mono<@NonNull Tuple2<C, V>>> rf) {
-        return apply(mono.onErrorResume(err -> {
+        return keepSched(mono.onErrorResume(err -> {
             if (err instanceof ExceptionWithContext ei) {
                 return attempt(ei.getContext(), () -> rf.apply(ei.getContext(), ei.err));
             }
@@ -240,15 +250,15 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> retry() {
-        return apply(mono.retry());
+        return replace2(mono.retry());
     }
 
     public Mono2<C, V> retry(long numRetries) {
-        return apply(mono.retry(numRetries));
+        return replace2(mono.retry(numRetries));
     }
 
     public Mono2<C, V> retryWhen(Retry retry) {
-        return apply(mono.retryWhen(retry));
+        return replace2(mono.retryWhen(retry));
     }
 
     public Mono<@NonNull Tuple2<C, Optional<Throwable>>> context() {
@@ -306,19 +316,19 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C, U> map(Function1<? super V, ? extends U> mf) {
-        return apply(mapHandle(mono, t -> t.map2(mf)));
+        return replace2(mapHandle(mono, t -> t.map2(mf)));
     }
 
     public <U> Mono2<C, U> zmap(Function2<? super C, ? super V, ? extends U> mf) {
-        return apply(mapHandle(mono, t -> Tuple.of(t._1, mf.apply(t._1, t._2))));
+        return replace2(mapHandle(mono, t -> Tuple.of(t._1, mf.apply(t._1, t._2))));
     }
 
     public <U> Mono2<C, U> mapM(Function1<? super V, Mono<@NonNull U>> mf) {
-        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).map(u -> Tuple.of(t._1, u)))));
+        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).map(u -> Tuple.of(t._1, u)))));
     }
 
     public <U> Mono2<C, U> zmapM(Function2<? super C, ? super V, Mono<@NonNull U>> mf) {
-        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).map(u -> Tuple.of(t._1, u)))));
+        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).map(u -> Tuple.of(t._1, u)))));
     }
 
     public <U> Mono2<C, U> mapF(Function1<? super V, ? extends CompletionStage<U>> mf) {
@@ -343,16 +353,16 @@ public class Mono2<C, V> {
 
     // C 가 빠져 있어서,  haskell의 bind 에 해당하지는 않음.
     public <U> Mono2<C, U> flatMap(Function1<? super V, Mono2<C, U>> mf) {
-        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).mono)));
+        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).mono)));
     }
 
     // c가 포함된 z 버젼이 haskell의 bind 에 해당
     public <U> Mono2<C, U> zflatMap(Function2<?super C, ? super V, Mono2<C, U>> mf) {
-        return apply(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).mono)));
+        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).mono)));
     }
 
     public <U> Mono2<C, U> then(Mono2<C, U> next) {
-        return apply(mono.flatMap(t -> attempt(t._1, () -> next.mono)));
+        return replace2(mono.flatMap(t -> attempt(t._1, () -> next.mono)));
     }
 
     public <U> Mono2<C, U> then(Function<C, Mono2<C, U>> next) {
@@ -365,7 +375,7 @@ public class Mono2<C, V> {
     }
 
     private Mono2<C, V> filter(Function2<C, ? super V, Boolean> pred) {
-        return apply(mapHandle(mono, t -> {
+        return replace2(mapHandle(mono, t -> {
             if (Boolean.TRUE.equals(pred.apply(t._1, t._2))) {
                 return t;
             }
@@ -389,7 +399,7 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C, Tuple2<V, U>> zipWhen(Function2<C, ? super V, Mono<@NonNull U>> other) {
-        return apply(mono.flatMap(t -> attempt(t._1, () ->
+        return replace2(mono.flatMap(t -> attempt(t._1, () ->
             other.apply(t._1, t._2).map(u -> Tuple.of(t._1, Tuple.of(t._2, u)))
         )));
     }
@@ -415,13 +425,13 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> delayUntil(Function2<C, ? super V, ? extends Publisher<?>> other) {
-        return apply(mono.flatMap(t -> attempt(t._1, () ->
+        return replace2(mono.flatMap(t -> attempt(t._1, () ->
             Mono.just(t).delayUntil(x -> other.apply(x._1, x._2))
         )));
     }
 
     public Mono2<C, V> delayElement(Duration delay) {
-        return apply(mono.delayElement(delay));
+        return replace2(mono.delayElement(delay));
     }
 
     public <U> Mono2<C, U> cast(Class<U> type) {
@@ -433,7 +443,7 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, Tuple2<Long, V>> elapsed() {
-        return apply(mono.elapsed().map(t -> {
+        return replace2(mono.elapsed().map(t -> {
             var cv = t.getT2();
             return Tuple.of(cv._1, Tuple.of(t.getT1(), cv._2));
         }));
@@ -444,7 +454,7 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> doOnNext(BiConsumer<? super C, ? super V> consumer) {
-        return apply(mapHandle(mono, t -> {
+        return replace2(mapHandle(mono, t -> {
             consumer.accept(t._1, t._2);
             return t;
         }));
@@ -455,7 +465,7 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> doOnError(BiConsumer<? super C, ? super Throwable> consumer) {
-        return apply(mono.doOnError(err -> {
+        return replace2(mono.doOnError(err -> {
             if (err instanceof ExceptionWithContext ei) {
                 consumer.accept(ei.getContext(), ei.err);
             }
@@ -463,30 +473,30 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> doFinally(Consumer<SignalType> onFinally) {
-        return apply(mono.doFinally(onFinally));
+        return replace2(mono.doFinally(onFinally));
     }
 
     public Mono2<C, V> doOnCancel(Runnable onCancel) {
-        return apply(mono.doOnCancel(onCancel));
+        return replace2(mono.doOnCancel(onCancel));
     }
 
     public Mono2<C, Tuple0> putWith(Function2<C, ? super V, C> wf) {
-        return apply(mapHandle(mono, t -> Tuple.of(wf.apply(t._1, t._2), Tuple0.instance())));
+        return replace2(mapHandle(mono, t -> Tuple.of(wf.apply(t._1, t._2), Tuple0.instance())));
     }
 
     public Mono2<C, V> putSet(BiConsumer<C, ? super V> wf) {
-        return apply(mapHandle(mono, t -> {
+        return replace2(mapHandle(mono, t -> {
             wf.accept(t._1, t._2);
             return t;
         }));
     }
 
     public Mono2<C, C> getC() {
-        return apply(mono.map(t -> Tuple.of(t._1, t._1)));
+        return replace2(mono.map(t -> Tuple.of(t._1, t._1)));
     }
 
     public Mono2<C, Tuple2<C,V>> zgetC() {
-        return apply(mono.map(t -> Tuple.of(t._1, Tuple.of(t._1,t._2))));
+        return replace2(mono.map(t -> Tuple.of(t._1, Tuple.of(t._1,t._2))));
     }
 
     public <R> Mono2<C, R> getS(Function1<? super C, ? extends R> gf) {
@@ -522,12 +532,12 @@ public class Mono2<C, V> {
     }
 
     public <CO> Mono2<CO, V> modify(Function1<C, CO> onSuccess, Function2<C,Throwable,CO> onError) {
-        return apply(mapHandle(mono, t -> t.map1(onSuccess)).onErrorMap(err -> remapContext(err, onError)));
+        return replace2(mapHandle(mono, t -> t.map1(onSuccess)).onErrorMap(err -> remapContext(err, onError)));
     }
 
     // V 혹은 error 를 이용해서 C 를 modify 하는 경우
     public <CO> Mono2<CO, Tuple0> modifyWith(Function2<C, ? super V, CO> onSuccess, Function2<C,Throwable,CO> onError) {
-        return apply(mapHandle(mono, t -> Tuple.of(onSuccess.apply(t._1, t._2), Tuple0.instance())).onErrorMap(err -> remapContext(err, onError)));
+        return replace2(mapHandle(mono, t -> Tuple.of(onSuccess.apply(t._1, t._2), Tuple0.instance())).onErrorMap(err -> remapContext(err, onError)));
     }
 
     private static <C, CO> Throwable remapContext(Throwable err, Function2<C, Throwable, CO> onError) {
@@ -765,4 +775,8 @@ class ExceptionWithContext extends RuntimeException {
     <T> T getContext() {
         return (T) context;
     }
+}
+
+record Env(Optional<Scheduler> sched) {
+    final static Env subscribedOnCallerThread = new Env(Optional.empty());
 }
