@@ -22,6 +22,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+
+
 /*
 name convention:
  C 는 Context , V 는 Value 를 의미
@@ -60,20 +62,11 @@ name convention:
  * @param <V> Value
  */
 public class Mono2<C, V> {
-    static class ExceptionWithContext extends RuntimeException {
-        private final Object context;
-        final Throwable err;
 
-        ExceptionWithContext(Object c, Throwable err) {
-            super(err);
-            this.context = c;
-            this.err = err;
-        }
+    private final Mono<@NonNull  Tuple2<C, V>> mono;
 
-        @SuppressWarnings("unchecked")
-        <T> T getContext() {
-            return (T) context;
-        }
+    private Mono2(Mono<@NonNull Tuple2<C, V>> mono) {
+        this.mono = mono;
     }
 
     private static Throwable wrap(Object context, Throwable err) {
@@ -101,11 +94,6 @@ public class Mono2<C, V> {
         });
     }
 
-    public final Mono<@NonNull  Tuple2<C, V>> mono;
-
-    private Mono2(Mono<@NonNull Tuple2<C, V>> mono) {
-        this.mono = mono;
-    }
 
     private static <C, V> Mono2<C, V> apply(Mono<@NonNull Tuple2<C, V>> mono) {
         return new Mono2<>(mono);
@@ -759,5 +747,22 @@ public class Mono2<C, V> {
 
     public <A1, A2, A3, A4, A5, A6, A7, A8, R> Mono2<C, R> getS8mapF(Function<? super C,? extends A1> g1, Function<? super C, ? extends A2> g2, Function<? super C, ? extends A3> g3, Function<? super C, ? extends A4> g4, Function<? super C, ? extends A5> g5, Function<? super C, ? extends A6> g6, Function<? super C, ? extends A7> g7, Function<? super C, ? extends A8> g8, Function8<? super A1, ? super A2, ? super A3, ? super A4, ? super A5, ? super A6, ? super A7, ? super A8, ? extends CompletionStage<R>> mf) {
         return getS8(g1, g2, g3, g4, g5, g6, g7, g8).mapF(t -> mf.apply(t._1, t._2, t._3, t._4, t._5, t._6, t._7, t._8));
+    }
+}
+
+
+class ExceptionWithContext extends RuntimeException {
+    private final Object context;
+    final Throwable err;
+
+    ExceptionWithContext(Object c, Throwable err) {
+        super(err);
+        this.context = c;
+        this.err = err;
+    }
+
+    @SuppressWarnings("unchecked")
+    <T> T getContext() {
+        return (T) context;
     }
 }

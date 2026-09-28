@@ -137,7 +137,7 @@ public class TestMono2 {
     public void testTransformMDoesNotClobberInnerContext() {
         var inner = Mono2.of("InnerT", "v")
             .mapT(u -> Try.<String>failure(new IOException("tm-fail")));
-        var m = Mono2.of("OuterT", "x").transformM((c, v) -> inner.mono);
+        var m = Mono2.of("OuterT", "x").zflatMap((c, v) -> inner);
 
         var ctx = m.context().block();
         Assertions.assertEquals("InnerT", ctx._1);
@@ -470,5 +470,33 @@ public class TestMono2 {
 
         var sum = ilist.foldlF(0, (a , i ) ->  CompletableFuture.supplyAsync(() -> a + i )).get();
         Assertions.assertEquals(4950, (int) sum);
+    }
+
+    public Mono<Integer> dbMono(String s) {
+        return Mono.fromCallable(() -> 10).map(i -> {
+            System.out.printf("dbMono thread = %s\n", Thread.currentThread().getName());
+            return i;
+        }).subscribeOn(Schedulers.newSingle("s1"));
+    }
+    @Test
+    public void testScheduler() {
+        var s1 = Schedulers.newParallel("p1");
+        var s2 = Schedulers.newParallel("p2");
+        var m = Mono2.contextOf(RecoverContext.empty())
+            .map(u -> {
+                System.out.printf("thread = %s\n", Thread.currentThread().getName());
+                return Thread.currentThread().getName();
+            }).publishOn(s2)
+            .map(s -> {
+                System.out.printf("thread = %s\n", Thread.currentThread().getName());
+                return Thread.currentThread().getName();
+            }).mapM(this::dbMono)
+            .map(i -> {
+                System.out.printf("after dbMono thread = %s\n", Thread.currentThread().getName());
+                return Thread.currentThread().getName();
+            })
+        ;
+
+        m.subscribeOn(s1).value().block();
     }
 }
