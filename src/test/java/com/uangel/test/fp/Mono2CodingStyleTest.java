@@ -8,10 +8,13 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -26,8 +29,11 @@ class StyleContext {
     int result1;
     int result2;
     int sum;
+    Record record;
     Throwable errorIndication;
 }
+
+record Record(int id) {}
 
 public class Mono2CodingStyleTest {
     CompletableFuture<Integer> getResult1() {
@@ -157,6 +163,77 @@ public class Mono2CodingStyleTest {
     Mono<@NonNull Integer> asyncSum(int a, int b) {
         return Mono.just(a+b);
     }
+
+
+    // thread pool 은 크게 호처리, IO(DB,File,Network) , OAM(통계,로깅)  세개로 구분합니다.
+    Scheduler schedCall = Schedulers.newParallel("call");
+    Scheduler schedIO = Schedulers.newParallel("io");
+    Scheduler schedOAM = Schedulers.newParallel("oam");
+
+    // mono를 리턴할 때 ,  어디서 실행될지 지정합니다.
+    Mono<Record> dbTransaction(StyleContext ctx, int id) {
+        return Mono.fromCallable(() -> new Record(id))
+            .doOnNext(r -> {
+            // io thread 에서 실행됩니다.
+            System.out.printf("dbTransaction running in thread %s\n", Thread.currentThread().getName());
+        }).subscribeOn(schedIO);
+    }
+
+    Mono<Tuple0> logging(StyleContext ctx) {
+        // 이부분 코드는 call 스레드에서 실행되기 때문에
+        // oam 스레드에서 실행되어야 할 것은  mono 쪽에 코드를 두기 바람.
+        return Mono.fromCallable(() -> {
+            // oam thread 에서 실행됩니다.
+            System.out.printf("id = %d, logging in thread %s\n", ctx.getRecord().id(), Thread.currentThread().getName());
+            return Tuple0.instance();
+        }).subscribeOn(schedOAM);
+    }
+
+    Mono<Tuple0> errorLogging(StyleContext ctx, Throwable err) {
+        // 이부분 코드는 call 스레드에서 실행되기 때문에
+        // oam 스레드에서 실행되어야 할 것은  mono 쪽에 코드를 두기 바람.
+        return Mono.fromCallable(() -> {
+            // oam thread 에서 실행됩니다.
+            System.out.printf("id = %d, logging error in thread %s\n", ctx.getRecord().id(), Thread.currentThread().getName());
+            return Tuple0.instance();
+        }).subscribeOn(schedOAM);
+    }
+
+    @Test
+    public void schedulerPattern() {
+        Mono2.contextOf(StyleContext.empty())
+            // mono2 는 subscribeOn 기능이 없기 때문에 Mono2 생성 후에 scheduler 를 지정해야 함.
+            .publishOn(schedCall)
+            .map(u -> 12)
+            .doOnNext(v -> {
+                // call thread 에서 실행됩니다.
+                System.out.printf("on next v -> 12 in thread %s\n", Thread.currentThread().getName());
+            })
+            // dbTransaction 함수 안에서 thread 를 지정해 두었기 때문에,  IO thread 에서 실행됨.
+            .zmapM(this::dbTransaction)
+            .doOnNext(v -> {
+                // Mono2.publishOn 효과로,  dbTransaction 이 끝나고 나면  call thread 로 다시 publishOn 됨
+                // call thread 에서 실행됩니다.
+                System.out.printf("on next this::dbTransaction in thread %s\n", Thread.currentThread().getName());
+            })
+            .putWith(StyleContext::withRecord)
+            .getC()
+            // logging 은 oam thread 에서 실행되는데, 결과를 기다리지 않음.
+            // oam 통계, 로깅 처리 작업 중에 발생하는 지연이 호처리에 영향을 주면 안되기 때문에
+            // oam 관련 일은 peekM 을 이용하여 호출, logging 을 기다리지 않고 다음으로 진행됨.
+            .peekM(this::logging)
+            .peekErrorM(this::errorLogging)
+            .doOnNext(v -> {
+                // 실행후 call thread 로 다시 돌아옴.
+                // call thread 에서 실행됩니다.
+                // logging 에서 출력된 것보다 이게 더 먼저 출력될 수 있음.
+                System.out.printf("on next this::logging in thread %s\n", Thread.currentThread().getName());
+            })
+            .value().block()
+        ;
+        ;
+    }
+
 
     @Test
     public void antiPattern() {

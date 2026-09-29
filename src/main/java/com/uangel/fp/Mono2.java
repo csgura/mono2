@@ -76,13 +76,14 @@ public class Mono2<C, V> {
         return err instanceof ExceptionWithContext ? err : new ExceptionWithContext(context, err);
     }
 
-    private static <T> Mono<@NonNull  T> attempt(Object context, Supplier<Mono<@NonNull T>> supplier) {
+    private static <C,T> Mono<@NonNull T> catchSupplier(C context, Supplier<Mono<@NonNull T>> supplier) {
         try {
             return supplier.get().onErrorMap(err -> wrap(context, err));
         } catch (Throwable e) {
             return Mono.error(wrap(context, e));
         }
     }
+
 
     private static <CI, VI, CO, UO> Mono<@NonNull Tuple2<CO, UO>> mapHandle(
         Mono<@NonNull Tuple2<CI, VI>> source,
@@ -107,19 +108,19 @@ public class Mono2<C, V> {
     }
 
     public static <C, V> Mono2<C, V> from(C c, Mono<@NonNull V> source) {
-        return apply(Env.subscribedOnCallerThread, attempt(c, () -> source.map(v -> Tuple.of(c, v))));
+        return apply(Env.subscribedOnCallerThread, catchSupplier(c, () -> source.map(v -> Tuple.of(c, v))));
     }
 
-    public static <C, V> Mono2<C, V> fromCallable(C c, Callable<V> callable) {
-        return from(c, Mono.fromCallable(callable));
+    public static <C, V> Mono2<C, V> fromCallable(C c, Callable<V> callable, Scheduler scheduler) {
+        return apply(new Env(Optional.of(scheduler)), catchSupplier(c, () -> Mono.fromCallable(callable)).map(v -> Tuple.of(c,v)));
     }
 
-    public static <C, V> Mono2<C, V> fromSupplier(C c, Supplier<V> supplier) {
+    public static <C, V> Mono2<C, V> fromSupplier(C c, Supplier<V> supplier, Scheduler scheduler) {
         return from(c, Mono.fromSupplier(supplier));
     }
 
-    public static <C, V> Mono2<C, V> defer(Supplier<Mono2<C, V>> supplier) {
-        return apply(Env.subscribedOnCallerThread, Mono.defer(() -> supplier.get().mono));
+    public static <C, V> Mono2<C, V> defer(Supplier<Mono2<C, V>> supplier, Scheduler scheduler) {
+        return apply(new Env(Optional.of(scheduler)), Mono.defer(() -> supplier.get().mono));
     }
 
     public static <C, V> Mono2<C, V> error(C c, Throwable err) {
@@ -154,10 +155,9 @@ public class Mono2<C, V> {
         return keepEnv(mono.share());
     }
 
-    public Mono2<C, V> subscribeOn(@NonNull Scheduler scheduler) {
-        return apply(env.withSomeSched(scheduler), mono.subscribeOn(scheduler));
-    }
-
+    // subscribeOn 기능은 제공하지 않음.
+    // publishOn 을 호출한 경우 scheduler 를 기억해 두었다가
+    // mapM, flatMapM 후에 기억해 둔 scheduler로 publishOn 하게됨.
     public Mono2<C, V> publishOn(@NonNull Scheduler scheduler) {
         return apply(env.withSomeSched(scheduler), mono.publishOn(scheduler));
     }
@@ -179,7 +179,7 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C, U> transformM(Function2<C, ? super V, Mono<@NonNull Tuple2<C, U>>> f) {
-        return keepSched(mono.flatMap(t -> attempt(t._1, () -> f.apply(t._1,t._2))));
+        return keepSched(mono.flatMap(t -> catchSupplier(t._1, () -> f.apply(t._1,t._2))));
     }
 
     public <U> Mono2<C, U> transformF(Function2<C, ? super V, CompletableFuture<Tuple2<C, U>>> f) {
@@ -210,7 +210,7 @@ public class Mono2<C, V> {
     public <CO, R> Mono2<CO, R> either(Function2<C, ? super V, Tuple2<CO, R>> onSuccess, Function2<C, Throwable, Tuple2<CO, R>> onFailure) {
         return keepEnv(mapHandle(mono, t -> onSuccess.apply(t._1, t._2)).onErrorResume(err -> {
             if (err instanceof ExceptionWithContext ei) {
-                return attempt(ei.getContext(), () -> Mono.just(onFailure.apply(ei.getContext(), ei.err)));
+                return catchSupplier(ei.getContext(), () -> Mono.just(onFailure.apply(ei.getContext(), ei.err)));
             }
             return Mono.error(err);
         }));
@@ -223,7 +223,7 @@ public class Mono2<C, V> {
     public Mono2<C, V> recoverM(Function2<C, Throwable, Mono<@NonNull Tuple2<C, V>>> rf) {
         return keepSched(mono.onErrorResume(err -> {
             if (err instanceof ExceptionWithContext ei) {
-                return attempt(ei.getContext(), () -> rf.apply(ei.getContext(), ei.err));
+                return catchSupplier(ei.getContext(), () -> rf.apply(ei.getContext(), ei.err));
             }
             return Mono.error(err);
         }));
@@ -325,11 +325,11 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C, U> mapM(Function1<? super V, Mono<@NonNull U>> mf) {
-        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).map(u -> Tuple.of(t._1, u)))));
+        return keepSched(mono.flatMap(t -> catchSupplier(t._1, () -> mf.apply(t._2).map(u -> Tuple.of(t._1, u)))));
     }
 
     public <U> Mono2<C, U> zmapM(Function2<? super C, ? super V, Mono<@NonNull U>> mf) {
-        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).map(u -> Tuple.of(t._1, u)))));
+        return keepSched(mono.flatMap(t -> catchSupplier(t._1, () -> mf.apply(t._1, t._2).map(u -> Tuple.of(t._1, u)))));
     }
 
     public <U> Mono2<C, U> mapF(Function1<? super V, ? extends CompletionStage<U>> mf) {
@@ -354,12 +354,12 @@ public class Mono2<C, V> {
 
     // C 가 빠져 있어서,  haskell의 bind 에 해당하지는 않음.
     public <U> Mono2<C, U> flatMap(Function1<? super V, Mono2<C, U>> mf) {
-        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._2).mono)));
+        return keepSched(mono.flatMap(t -> catchSupplier(t._1, () -> mf.apply(t._2).mono)));
     }
 
     // c가 포함된 z 버젼이 haskell의 bind 에 해당
     public <U> Mono2<C, U> zflatMap(Function2<?super C, ? super V, Mono2<C, U>> mf) {
-        return keepSched(mono.flatMap(t -> attempt(t._1, () -> mf.apply(t._1, t._2).mono)));
+        return keepSched(mono.flatMap(t -> catchSupplier(t._1, () -> mf.apply(t._1, t._2).mono)));
     }
 
     public <U> Mono2<C, U> then(Mono2<C, U> next) {
@@ -400,7 +400,7 @@ public class Mono2<C, V> {
     }
 
     public <U> Mono2<C, Tuple2<V, U>> zipWhen(Function2<C, ? super V, Mono<@NonNull U>> other) {
-        return keepEnv(mono.flatMap(t -> attempt(t._1, () ->
+        return keepEnv(mono.flatMap(t -> catchSupplier(t._1, () ->
             other.apply(t._1, t._2).map(u -> Tuple.of(t._1, Tuple.of(t._2, u)))
         )));
     }
@@ -426,7 +426,7 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> delayUntil(Function2<C, ? super V, ? extends Publisher<?>> other) {
-        return keepEnv(mono.flatMap(t -> attempt(t._1, () ->
+        return keepEnv(mono.flatMap(t -> catchSupplier(t._1, () ->
             Mono.just(t).delayUntil(x -> other.apply(x._1, x._2))
         )));
     }
@@ -448,6 +448,49 @@ public class Mono2<C, V> {
             var cv = t.getT2();
             return Tuple.of(cv._1, Tuple.of(t.getT1(), cv._2));
         }));
+    }
+
+
+    // doOnNext 와 같은 기능이나,  리턴되는 mono를 기다리지 않는다.
+    public Mono2<C,V> peekM(Function<? super V, Mono<Tuple0>> asyncf) {
+        return doOnNext((c,v) -> {
+           asyncf.apply(v).toFuture();
+        });
+    }
+
+    // doOnNext 와 같은 기능이나,  리턴되는 mono를 기다리지 않는다.
+    public Mono2<C,V> peekM(Function2<? super C, ? super V, Mono<Tuple0>> asyncf) {
+        return doOnNext((c,v) -> {
+            asyncf.apply(c, v).toFuture();
+        });
+    }
+
+    // doOnError 와 같은 기능이나, 리턴되는 mono를 기다리지 않는다.
+    public Mono2<C,V> peekErrorM(Function<? super Throwable, Mono<Tuple0>> asyncf) {
+        return doOnError((c,v) -> {
+            asyncf.apply(v).toFuture();
+        });
+    }
+
+    // doOnError 와 같은 기능이나, 리턴되는 mono를 기다리지 않는다.
+    public Mono2<C,V> peekErrorM(Function2<? super C, ? super Throwable, Mono<Tuple0>> asyncf) {
+        return doOnError((c,v) -> {
+            asyncf.apply(c, v).toFuture();
+        });
+    }
+
+    // peekM 과 peekErrorM 을 합친 버젼
+    public Mono2<C,V> peekTryM(Function<Try<V>, Mono<Tuple0>> asyncf) {
+        return peekM(v -> asyncf.apply(Try.success(v)))
+            .peekErrorM(err -> asyncf.apply(Try.failure(err)))
+            ;
+    }
+
+    // peekM 과 peekErrorM 을 합친 버젼
+    public Mono2<C,V> peekTryM(Function2<? super C, Try<V>, Mono<Tuple0>> asyncf) {
+        return peekM((c,v) -> asyncf.apply(c, Try.success(v)))
+            .peekErrorM((c, err) -> asyncf.apply(c, Try.failure(err)))
+            ;
     }
 
     public Mono2<C, V> doOnNext(Consumer<? super V> consumer) {

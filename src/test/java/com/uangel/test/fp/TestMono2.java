@@ -255,8 +255,8 @@ public class TestMono2 {
     @Test
     public void testFromAndDeferAndError() {
         Assertions.assertEquals("x", Mono2.from("C", Mono.just("x")).value().block());
-        Assertions.assertEquals("call", Mono2.fromCallable("C", () -> "call").value().block());
-        Assertions.assertEquals("sup", Mono2.fromSupplier("C", () -> "sup").value().block());
+        Assertions.assertEquals("call", Mono2.fromCallable("C", () -> "call", Schedulers.immediate()).value().block());
+        Assertions.assertEquals("sup", Mono2.fromSupplier("C", () -> "sup", Schedulers.immediate()).value().block());
 
         var failed = Mono2.from("C", Mono.<String>error(new IOException("e")));
         var ctx = failed.context().block();
@@ -267,7 +267,7 @@ public class TestMono2 {
         Assertions.assertEquals("E", err.context().block()._1);
         Assertions.assertEquals("boom", err.context().block()._2.orElseThrow().getMessage());
 
-        var deferred = Mono2.defer(() -> Mono2.of("D", "v"));
+        var deferred = Mono2.defer(() -> Mono2.of("D", "v"), Schedulers.immediate());
         Assertions.assertEquals("v", deferred.value().block());
         Assertions.assertEquals("D", deferred.context().block()._1);
     }
@@ -359,7 +359,7 @@ public class TestMono2 {
                 return Mono2.<String, Integer>error("C", new IOException("again"));
             }
             return Mono2.of("C", n.get());
-        }).retry(2);
+        }, Schedulers.immediate()).retry(2);
         Assertions.assertEquals(3, retried.value().block());
 
         Assertions.assertEquals("x", Mono2.of("C", (Object) "x").cast(String.class).value().block());
@@ -369,7 +369,7 @@ public class TestMono2 {
 
         Assertions.assertEquals("next", Mono2.of("C", "prev").then(Mono2.of("C", "next")).value().block());
         Assertions.assertEquals(1, Mono2.of("C", 1).delayUntil(v -> Mono.empty()).value().block());
-        Assertions.assertEquals(1, Mono2.of("C", 1).subscribeOn(Schedulers.immediate()).value().block());
+        Assertions.assertEquals(1, Mono2.of("C", 1).publishOn(Schedulers.immediate()).value().block());
         Assertions.assertTrue(Mono2.of("C", 1).elapsed().value().block()._1 >= 0);
     }
 
@@ -450,7 +450,7 @@ public class TestMono2 {
     @Test
     public void testTraverse() throws ExecutionException, InterruptedException {
         var list = List.of(1,2,3).traverseM2("", (s, v) -> {
-           return Mono2.fromCallable(s , v::toString);
+           return Mono2.fromCallable(s , v::toString, Schedulers.immediate());
         }).eval().get();
 
         Assertions.assertEquals(3, list.size());
@@ -483,10 +483,10 @@ public class TestMono2 {
     }
 
     public Mono2<RecoverContext, Integer> dbMono2(RecoverContext c, String s) {
-        return Mono2.contextOf(c).map(t -> {
+        return Mono2.contextOf(c).publishOn(Schedulers.newSingle("s2")).map(t -> {
             System.out.printf("dbMono2 thread = %s\n", Thread.currentThread().getName());
             return 10;
-        }).subscribeOn(Schedulers.newSingle("s2"));
+        });
     }
     @Test
     public void testScheduler() {
@@ -494,6 +494,7 @@ public class TestMono2 {
         var s1 = Schedulers.fromExecutorService(fp, "fp");
         var s2 = Schedulers.newParallel("p2",2);
         var m = Mono2.contextOf(RecoverContext.empty())
+            .publishOn(s1)
             .map(u -> {
                 System.out.printf("thread = %s\n", Thread.currentThread().getName());
                 return Thread.currentThread().getName();
@@ -511,6 +512,6 @@ public class TestMono2 {
             })
         ;
 
-        m.subscribeOn(s1).value().block();
+        m.value().block();
     }
 }
