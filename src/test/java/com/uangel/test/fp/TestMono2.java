@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -489,8 +490,9 @@ public class TestMono2 {
     }
     @Test
     public void testScheduler() {
-        var s1 = Schedulers.newParallel("p1");
-        var s2 = Schedulers.newParallel("p2");
+        var fp = new ForkJoinPool(4);
+        var s1 = Schedulers.fromExecutorService(fp, "fp");
+        var s2 = Schedulers.newParallel("p2",2);
         var m = Mono2.contextOf(RecoverContext.empty())
             .map(u -> {
                 System.out.printf("thread = %s\n", Thread.currentThread().getName());
