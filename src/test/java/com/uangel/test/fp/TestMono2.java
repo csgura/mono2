@@ -318,7 +318,7 @@ public class TestMono2 {
     public void testDoOnNextAndDoOnError() {
         var seenV = new AtomicReference<Integer>();
         var seenC = new AtomicReference<String>();
-        Assertions.assertEquals(1, Mono2.of("C", 1).doOnNext(v -> seenV.set(v)).doOnNext((c, v) -> seenC.set(c)).value().block());
+        Assertions.assertEquals(1, Mono2.of("C", 1).doOnNext(v -> seenV.set(v)).zdoOnNext((c, v) -> seenC.set(c)).value().block());
         Assertions.assertEquals(1, seenV.get());
         Assertions.assertEquals("C", seenC.get());
 
@@ -326,7 +326,7 @@ public class TestMono2 {
         var seenErr = new AtomicReference<Throwable>();
         Mono2.of("C", 1)
             .mapT(v -> Try.<Integer>failure(new IOException("e")))
-            .doOnError((c, err) -> {
+            .zdoOnError((c, err) -> {
                 seenErrC.set(c);
                 seenErr.set(err);
             })

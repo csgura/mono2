@@ -34,9 +34,11 @@ name convention:
  transform 은 성공일 때 C,V 둘다 바꾸는 것을 의미
  either는 성공/실패 두가지 경우에 대해 , C,V 둘다 바꾸는 것을 의미
  recover 는 error 를 복구하는 것을 의미
- z 는 get 앞에 붙는 경우 C와 V 를 tuple로 zip 해서 리턴 한다는 의미
- z 가 map 앞에 붙는 경우 callback 에서 C,V 를 둘 다 아규먼트로 받는 다는 의미
+ peek 은 value 를 엿보는 것을 의미
+ z(zip)는 get 앞에 붙는 경우 C와 V 를 tuple로 zip 해서 리턴 한다는 의미
+ z(zip)가 map 앞에 붙는 경우 callback 에서 C,V 를 둘 다 아규먼트로 받는 다는 의미
 
+ 끝에 C 는 Context
  끝에 S 는 Supplier
  끝에 T 는 Try
  끝에 F 는 Future
@@ -452,35 +454,35 @@ public class Mono2<C, V> {
 
 
     public Mono2<C,V> peekCM(Function<? super C, Mono<Tuple0>> asyncf) {
-        return doOnNext((c,v) -> {
+        return zdoOnNext((c,v) -> {
             asyncf.apply(c).toFuture();
         });
     }
 
     // doOnNext 와 같은 기능이나,  리턴되는 mono를 기다리지 않는다.
     public Mono2<C,V> peekM(Function<? super V, Mono<Tuple0>> asyncf) {
-        return doOnNext((c,v) -> {
+        return zdoOnNext((c,v) -> {
            asyncf.apply(v).toFuture();
         });
     }
 
     // doOnNext 와 같은 기능이나,  리턴되는 mono를 기다리지 않는다.
     public Mono2<C,V> zpeekM(Function2<? super C, ? super V, Mono<Tuple0>> asyncf) {
-        return doOnNext((c,v) -> {
+        return zdoOnNext((c,v) -> {
             asyncf.apply(c, v).toFuture();
         });
     }
 
     // doOnError 와 같은 기능이나, 리턴되는 mono를 기다리지 않는다.
     public Mono2<C,V> peekErrorM(Function<? super Throwable, Mono<Tuple0>> asyncf) {
-        return doOnError((c,v) -> {
+        return zdoOnError((c,v) -> {
             asyncf.apply(v).toFuture();
         });
     }
 
     // doOnError 와 같은 기능이나, 리턴되는 mono를 기다리지 않는다.
     public Mono2<C,V> zpeekErrorM(Function2<? super C, ? super Throwable, Mono<Tuple0>> asyncf) {
-        return doOnError((c,v) -> {
+        return zdoOnError((c,v) -> {
             asyncf.apply(c, v).toFuture();
         });
     }
@@ -500,10 +502,10 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> doOnNext(Consumer<? super V> consumer) {
-        return doOnNext((c, v) -> consumer.accept(v));
+        return zdoOnNext((c, v) -> consumer.accept(v));
     }
 
-    public Mono2<C, V> doOnNext(BiConsumer<? super C, ? super V> consumer) {
+    public Mono2<C, V> zdoOnNext(BiConsumer<? super C, ? super V> consumer) {
         return keepEnv(mapHandle(mono, t -> {
             consumer.accept(t._1, t._2);
             return t;
@@ -511,10 +513,10 @@ public class Mono2<C, V> {
     }
 
     public Mono2<C, V> doOnError(Consumer<? super Throwable> consumer) {
-        return doOnError((c, err) -> consumer.accept(err));
+        return zdoOnError((c, err) -> consumer.accept(err));
     }
 
-    public Mono2<C, V> doOnError(BiConsumer<? super C, ? super Throwable> consumer) {
+    public Mono2<C, V> zdoOnError(BiConsumer<? super C, ? super Throwable> consumer) {
         return keepEnv(mono.doOnError(err -> {
             if (err instanceof ExceptionWithContext ei) {
                 consumer.accept(ei.getContext(), ei.err);
