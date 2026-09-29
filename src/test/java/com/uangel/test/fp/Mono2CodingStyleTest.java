@@ -222,7 +222,7 @@ public class Mono2CodingStyleTest {
             // oam 통계, 로깅 처리 작업 중에 발생하는 지연이 호처리에 영향을 주면 안되기 때문에
             // oam 관련 일은 peekM 을 이용하여 호출, logging 을 기다리지 않고 다음으로 진행됨.
             .peekM(this::logging)
-            .peekErrorM(this::errorLogging)
+            .zpeekErrorM(this::errorLogging)
             .doOnNext(v -> {
                 // 실행후 call thread 로 다시 돌아옴.
                 // call thread 에서 실행됩니다.

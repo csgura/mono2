@@ -451,6 +451,12 @@ public class Mono2<C, V> {
     }
 
 
+    public Mono2<C,V> peekCM(Function<? super C, Mono<Tuple0>> asyncf) {
+        return doOnNext((c,v) -> {
+            asyncf.apply(c).toFuture();
+        });
+    }
+
     // doOnNext 와 같은 기능이나,  리턴되는 mono를 기다리지 않는다.
     public Mono2<C,V> peekM(Function<? super V, Mono<Tuple0>> asyncf) {
         return doOnNext((c,v) -> {
@@ -459,7 +465,7 @@ public class Mono2<C, V> {
     }
 
     // doOnNext 와 같은 기능이나,  리턴되는 mono를 기다리지 않는다.
-    public Mono2<C,V> peekM(Function2<? super C, ? super V, Mono<Tuple0>> asyncf) {
+    public Mono2<C,V> zpeekM(Function2<? super C, ? super V, Mono<Tuple0>> asyncf) {
         return doOnNext((c,v) -> {
             asyncf.apply(c, v).toFuture();
         });
@@ -473,7 +479,7 @@ public class Mono2<C, V> {
     }
 
     // doOnError 와 같은 기능이나, 리턴되는 mono를 기다리지 않는다.
-    public Mono2<C,V> peekErrorM(Function2<? super C, ? super Throwable, Mono<Tuple0>> asyncf) {
+    public Mono2<C,V> zpeekErrorM(Function2<? super C, ? super Throwable, Mono<Tuple0>> asyncf) {
         return doOnError((c,v) -> {
             asyncf.apply(c, v).toFuture();
         });
@@ -487,9 +493,9 @@ public class Mono2<C, V> {
     }
 
     // peekM 과 peekErrorM 을 합친 버젼
-    public Mono2<C,V> peekTryM(Function2<? super C, Try<V>, Mono<Tuple0>> asyncf) {
-        return peekM((c,v) -> asyncf.apply(c, Try.success(v)))
-            .peekErrorM((c, err) -> asyncf.apply(c, Try.failure(err)))
+    public Mono2<C,V> zpeekTryM(Function2<? super C, Try<V>, Mono<Tuple0>> asyncf) {
+        return zpeekM((c,v) -> asyncf.apply(c, Try.success(v)))
+            .zpeekErrorM((c, err) -> asyncf.apply(c, Try.failure(err)))
             ;
     }
 
