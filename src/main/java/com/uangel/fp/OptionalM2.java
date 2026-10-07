@@ -34,8 +34,8 @@ public class OptionalM2 {
         return m2.mapT(ov -> ov.map(Try::success).orElseGet(() -> Try.failure(errf.get())));
     }
 
-    public static <C,V> Mono2<C, V> subget(Mono2<C,Optional<V>> m2, String message) {
-        return m2.mapT(ov -> ov.map(Try::success).orElseGet(() -> Try.failure(new NoSuchElementException(message))));
+    public static <C,V> Mono2<C, V> subget(Mono2<C,Optional<V>> m2, String fmt, Object ... args) {
+        return m2.mapT(ov -> ov.map(Try::success).orElseGet(() -> Try.failure(new NoSuchElementException(String.format(fmt, args)))));
     }
 
     public static <C,V> Mono2<C, V> orElse(Mono2<C,Optional<V>> m2, V other) {

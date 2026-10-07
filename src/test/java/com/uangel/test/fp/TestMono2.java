@@ -3,8 +3,10 @@ package com.uangel.test.fp;
 import com.uangel.fp.ListTraversable;
 import com.uangel.fp.Mono2;
 import com.uangel.fp.OptionalM2;
+import com.uangel.fp.TupleM2;
 import io.vavr.Tuple;
 import io.vavr.Tuple0;
+import io.vavr.Tuple3;
 import io.vavr.collection.List;
 import io.vavr.collection.Stream;
 import io.vavr.control.Try;
@@ -37,7 +39,7 @@ class RecoverContext {
     String status;
 }
 
-@ExtensionMethod(value = {OptionalM2.class, ListTraversable.class})
+@ExtensionMethod(value = {OptionalM2.class, ListTraversable.class, TupleM2.class})
 public class TestMono2 {
     @Test
     public void testMono2Recover() throws ExecutionException, InterruptedException {
@@ -514,4 +516,21 @@ public class TestMono2 {
 
         m.value().block();
     }
+
+    public int sum3(int a, int b, int c) {
+        return a + b + c;
+    }
+
+    @Test
+    public void testTupleM2() {
+        var s = Mono2.contextOf(Tuple.of(1,2,3))
+            .getS(Tuple3::_1)
+            .t1append(Tuple3::_2)
+            .t2append(Tuple3::_3)
+            .t3map(this::sum3)
+            .value().block()
+        ;
+        Assertions.assertEquals(6, s);
+    }
+
 }

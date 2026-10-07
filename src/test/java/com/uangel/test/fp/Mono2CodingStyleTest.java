@@ -1,13 +1,14 @@
 package com.uangel.test.fp;
 
+import com.uangel.fp.FutureMonad;
 import com.uangel.fp.Mono2;
 import io.vavr.Tuple;
 import io.vavr.Tuple0;
 import io.vavr.Tuple2;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import io.vavr.control.Try;
+import lombok.*;
+import lombok.experimental.Delegate;
+import lombok.experimental.ExtensionMethod;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Assertions;
@@ -35,6 +36,7 @@ class StyleContext {
 
 record Record(int id) {}
 
+@ExtensionMethod(FutureMonad.class)
 public class Mono2CodingStyleTest {
     CompletableFuture<Integer> getResult1() {
         return CompletableFuture.completedFuture(10);
@@ -234,6 +236,98 @@ public class Mono2CodingStyleTest {
         ;
     }
 
+    @With
+    @Value
+    static class Stage1 {
+        String hello;
+    }
+
+    @With
+    @Value
+    static class Stage2 {
+        @Delegate
+        Stage1 base;
+        String message;
+    }
+
+    @Test
+    void stagedPattern() throws ExecutionException, InterruptedException {
+        var ret = Mono2.contextOf(new Stage1("hello"))
+            .getS(Stage1::getHello)
+            .map(s -> s + " world")
+            .modifyWith(Stage2::new, (c, err) -> new Stage2(c, err.getMessage()))
+            .exec().get()
+        ;
+
+        Assertions.assertEquals("hello world", ret._1.message);
+
+        var message = Mono2.contextOf(new Stage1("hello"))
+            .getS(Stage1::getHello)
+            .map(s -> s + " world")
+            .mapT(m -> Try.<String>failure(new NoSuchElementException("bad")))
+            .modifyWith(Stage2::new, (c, err) -> new Stage2(c, null))
+            .getS(Stage2::getMessage)
+            .eval().failed().get()
+        ;
+
+        Assertions.assertEquals("bad", message.getMessage());
+
+
+        ret = Mono2.contextOf(new Stage1("hello"))
+            .getS(Stage1::getHello)
+            .map(s -> s + " world")
+            .mapT(m -> Try.<String>failure(new NoSuchElementException("bad")))
+            .modifyWith(Stage2::new, (c, err) -> new Stage2(c, null))
+            .getS(Stage2::getMessage)
+            .exec().get()
+            ;
+
+        Assertions.assertNull(ret._1.message);
+        Assertions.assertTrue(ret._2.isPresent());
+        Assertions.assertEquals("bad", ret._2.get().getMessage());
+
+    }
+
+
+    @Value
+    @Builder
+    static class Request {
+        String addr;
+        int port;
+        String path;
+    }
+
+    @Value
+    @With
+    static class RequestContext {
+        String addr;
+        int port;
+        String path;
+    }
+
+    @Test
+    void builderPattern() throws ExecutionException, InterruptedException {
+        val r = Mono2.contextOf(new RequestContext("localhost",8080,"/some/path"))
+            .getS(c -> Request.builder())
+            .getWithNonNull(RequestContext::getAddr, Request.RequestBuilder::addr, "addr is null")
+            .getWith(RequestContext::getPort, Request.RequestBuilder::port)
+            .getWithNonNull(RequestContext::getPath, Request.RequestBuilder::path, c -> new NoSuchElementException(String.format("addr %s's path is null", c.addr)))
+            .map(Request.RequestBuilder::build).eval().get()
+        ;
+
+        Assertions.assertEquals("localhost", r.getAddr());
+        Assertions.assertEquals(8080, r.getPort());
+
+        val r2 = Mono2.contextOf(new RequestContext("localhost",8080,null))
+            .getS(c -> Request.builder())
+            .getWithNonNull(RequestContext::getAddr, Request.RequestBuilder::addr, "addr is null")
+            .getWith(RequestContext::getPort, Request.RequestBuilder::port)
+            .getWithNonNull(RequestContext::getPath, Request.RequestBuilder::path, c -> new NoSuchElementException(String.format("addr %s's path is null", c.addr)))
+            .map(Request.RequestBuilder::build).eval().failed().get()
+            ;
+
+        Assertions.assertEquals("addr localhost's path is null", r2.getMessage());
+    }
 
     @Test
     public void antiPattern() {

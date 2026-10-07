@@ -13,4 +13,20 @@ public class FutureMonad {
         return f.thenCompose(mf);
     }
 
+    public static <T> CompletableFuture<T> flatten(CompletableFuture<CompletableFuture<T>> f) {
+        return f.thenCompose(i ->i);
+    }
+
+    public static <T> CompletableFuture<Throwable> failed(CompletableFuture<T> f) {
+        return f.handle( (t, err) -> {
+            if(err != null) {
+                if (err.getCause() != null) {
+                    return CompletableFuture.completedFuture(err.getCause());
+                }
+                return CompletableFuture.completedFuture(err);
+            }
+            return CompletableFuture.<Throwable>failedFuture(new IllegalStateException("Future.success"));
+        }).thenCompose(i -> i);
+    }
+
 }
