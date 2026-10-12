@@ -329,6 +329,48 @@ public class Mono2CodingStyleTest {
         Assertions.assertEquals("addr localhost's path is null", r2.getMessage());
     }
 
+    @Value
+    @With
+    static class CommonContext {
+        String msgId;
+    }
+
+
+    @Value
+    @With
+    @NoArgsConstructor(staticName = "empty", force = true)
+    static class Tr1Context {
+        @Delegate
+        CommonContext common;
+    }
+
+    record Tr1Result(CommonContext ctx, String msg) {}
+    Mono<Tr1Result> tr1(CommonContext c, int maxRetry) {
+        return Mono2.contextOf(Tr1Context.empty().withCommon(c))
+            .getS(Tr1Context::getMsgId)
+            .zgetSmap(Tr1Context::getCommon, Tr1Result::new)
+            .value();
+    }
+
+    @Value
+    @With
+    @NoArgsConstructor(staticName = "empty", force = true)
+    static class ServiceContext {
+        @Delegate
+        CommonContext common;
+        String response;
+    }
+
+    @Test
+    public void interContext() throws ExecutionException, InterruptedException {
+        Mono2.contextOf(ServiceContext.empty().withCommon(new CommonContext("1")))
+            .replace(3)
+            .zgetSmapM(ServiceContext::getCommon, this::tr1)
+            .putWith((c,v) -> c.withCommon(v.ctx).withResponse(v.msg))
+
+        ;
+    }
+
     @Test
     public void antiPattern() {
         // mono는 함수 이기 때문에

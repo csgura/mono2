@@ -579,6 +579,19 @@ public class Mono2<C, V> {
         return zgetC().map(t -> t.map1(gf));
     }
 
+    public <A1,R> Mono2<C, R> zgetSmap(Function1<? super C, ? extends A1> gf, Function2<A1,V,R> f) {
+        return zgetS(gf).map(t -> f.apply(t._1,t._2));
+    }
+
+    public <A1,R> Mono2<C, R> zgetSmapM(Function1<? super C, ? extends A1> gf, Function2<A1,V,Mono<R>> f) {
+        return zgetS(gf).mapM(t -> f.apply(t._1,t._2));
+    }
+
+    public <A1,R> Mono2<C, R> zgetSmapF(Function1<? super C, ? extends A1> gf, Function2<A1,V,CompletableFuture<R>> f) {
+        return zgetS(gf).mapF(t -> f.apply(t._1,t._2));
+    }
+
+
     public <R> Mono2<C, R> getT(Function1<? super C, Try<R>> gf) {
         return getC().mapT(gf);
     }
