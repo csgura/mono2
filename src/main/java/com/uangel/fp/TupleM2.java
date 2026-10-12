@@ -12,35 +12,35 @@ import java.util.function.Function;
 @ExtensionMethod(OptionalMonad.class)
 public class TupleM2 {
     public static <C,A1,A2> Mono2<C, Tuple2<A1,A2>> t1append(Mono2<C,A1> m2 , Function<? super C, ? extends A2> gf) {
-        return m2.getWith(gf, Tuple::of);
+        return m2.merge(gf, Tuple::of);
     }
 
     public static <C,A1,A2> Mono2<C, Tuple2<A1,Optional<A2>>> t1appendO(Mono2<C,A1> m2 , Function<? super C, ? extends A2> gf) {
-        return m2.getWithO(gf, (t,v) -> Tuple.of(t,v.map(i ->i)));
+        return m2.mergeO(gf, (t,v) -> Tuple.of(t,v.map(i ->i)));
     }
 
     public static <C,A1,A2> Mono2<C, Tuple2<A1,A2>> t1appendNonNull(Mono2<C,A1> m2 , Function<? super C, ? extends A2> gf, Function<? super C, Throwable> onNull) {
-        return m2.getWithNonNull(gf , Tuple::of, onNull);
+        return m2.mergeNonNull(gf , Tuple::of, onNull);
     }
 
     public static <C,A1,A2> Mono2<C, Tuple2<A1,A2>> t1appendNonNull(Mono2<C,A1> m2 , Function<? super C, ? extends A2> gf, String fmt , Object ... args) {
-        return m2.getWithNonNull(gf , Tuple::of, fmt, args);
+        return m2.mergeNonNull(gf , Tuple::of, fmt, args);
     }
 
     public static <C,A1,A2,A3> Mono2<C, Tuple3<A1,A2,A3>> t2append(Mono2<C,Tuple2<A1,A2>> m2 , Function<? super C, ? extends A3> gf) {
-        return m2.getWith(gf, Tuple2::append);
+        return m2.merge(gf, Tuple2::append);
     }
 
     public static <C,A1,A2,A3> Mono2<C, Tuple3<A1,A2,Optional<A3>>> t2appendO(Mono2<C,Tuple2<A1,A2>> m2 , Function<? super C, ? extends A3> gf) {
-        return m2.getWithO(gf, (t, v) -> t.append(v.map(i -> i )));
+        return m2.mergeO(gf, (t, v) -> t.append(v.map(i -> i )));
     }
 
     public static <C,A1,A2,A3> Mono2<C, Tuple3<A1,A2,A3>> t2appendNonNull(Mono2<C,Tuple2<A1,A2>> m2 , Function<? super C, ? extends A3> gf,  Function<? super C, Throwable> onNull) {
-        return m2.getWithNonNull(gf, Tuple2::append,onNull );
+        return m2.mergeNonNull(gf, Tuple2::append,onNull );
     }
 
     public static <C,A1,A2,A3> Mono2<C, Tuple3<A1,A2,A3>> t2appendNonNull(Mono2<C,Tuple2<A1,A2>> m2 , Function<? super C, ? extends A3> gf,  String fmt , Object ... args) {
-        return m2.getWithNonNull(gf, Tuple2::append, fmt,args);
+        return m2.mergeNonNull(gf, Tuple2::append, fmt,args);
     }
 
 

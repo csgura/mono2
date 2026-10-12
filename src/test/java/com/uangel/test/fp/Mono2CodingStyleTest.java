@@ -255,7 +255,7 @@ public class Mono2CodingStyleTest {
         var ret = Mono2.contextOf(new Stage1("hello"))
             .getS(Stage1::getHello)
             .map(s -> s + " world")
-            .modifyWith(Stage2::new, (c, err) -> new Stage2(c, err.getMessage()))
+            .modifyWith(Stage2::new, (c, err) -> new Stage2(c, null))
             .exec().get()
         ;
 
@@ -309,9 +309,9 @@ public class Mono2CodingStyleTest {
     void builderPattern() throws ExecutionException, InterruptedException {
         val r = Mono2.contextOf(new RequestContext("localhost",8080,"/some/path"))
             .getS(c -> Request.builder())
-            .getWithNonNull(RequestContext::getAddr, Request.RequestBuilder::addr, "addr is null")
-            .getWith(RequestContext::getPort, Request.RequestBuilder::port)
-            .getWithNonNull(RequestContext::getPath, Request.RequestBuilder::path, c -> new NoSuchElementException(String.format("addr %s's path is null", c.addr)))
+            .mergeNonNull(RequestContext::getAddr, Request.RequestBuilder::addr, "addr is null")
+            .merge(RequestContext::getPort, Request.RequestBuilder::port)
+            .mergeNonNull(RequestContext::getPath, Request.RequestBuilder::path, c -> new NoSuchElementException(String.format("addr %s's path is null", c.addr)))
             .map(Request.RequestBuilder::build).eval().get()
         ;
 
@@ -320,9 +320,9 @@ public class Mono2CodingStyleTest {
 
         val r2 = Mono2.contextOf(new RequestContext("localhost",8080,null))
             .getS(c -> Request.builder())
-            .getWithNonNull(RequestContext::getAddr, Request.RequestBuilder::addr, "addr is null")
-            .getWith(RequestContext::getPort, Request.RequestBuilder::port)
-            .getWithNonNull(RequestContext::getPath, Request.RequestBuilder::path, c -> new NoSuchElementException(String.format("addr %s's path is null", c.addr)))
+            .mergeNonNull(RequestContext::getAddr, Request.RequestBuilder::addr, "addr is null")
+            .merge(RequestContext::getPort, Request.RequestBuilder::port)
+            .mergeNonNull(RequestContext::getPath, Request.RequestBuilder::path, c -> new NoSuchElementException(String.format("addr %s's path is null", c.addr)))
             .map(Request.RequestBuilder::build).eval().failed().get()
             ;
 

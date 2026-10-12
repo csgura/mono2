@@ -30,6 +30,7 @@ import java.util.function.Supplier;
 name convention:
  C 는 Context , V 는 Value 를 의미
  get 은  Context 의 값을  V 로 옮기는 것을 의미
+ merge는 Context의 값을 V 와 합쳐서 V 에 저장하는 것을 의미
  put 은 V 의 값을 Context로 옮기는 것을 의미
  modify 는 C 를 바꾸는 것을 의미
  transform 은 성공일 때 C,V 둘다 바꾸는 것을 의미
@@ -45,6 +46,7 @@ name convention:
  끝에 F 는 Future
  끝에 M 은 Mono
  끝에 O 는 Optional 을 의미
+ 끝에 NonNull은 getter 의 결과가 null 인 경우 error 로 하겠다는 것
  put이나 modify 뒤에 With 가 오는 경우,  with 함수 (C,V) -> C  를 사용한다는 의미
  Tuple 이 필요한 경우 2,3,4 등의 숫자를 붙임
 
@@ -601,19 +603,16 @@ public class Mono2<C, V> {
         return zgetC().mapF(t -> gf.apply(t._1).thenApply(r -> Tuple.of(r, t._2)));
     }
 
-    public <CO> Mono2<CO, V> modify(Function1<C, CO> modifyf) {
-        return modify(modifyf,(c, err) -> modifyf.apply(c));
-    }
 
-    public <U,W> Mono2<C,W> getWith(Function<? super C, U> gf , Function2<? super V , U, ? extends W> withf) {
+    public <U,W> Mono2<C,W> merge(Function<? super C, U> gf , Function2<? super V , U, ? extends W> withf) {
         return zmap((c,v) -> withf.apply(v,  gf.apply(c) ));
     }
 
-    public <U,W> Mono2<C,W> getWithO(Function<? super C, U> gf , Function2<? super V , Optional<U>, ? extends W> withf) {
+    public <U,W> Mono2<C,W> mergeO(Function<? super C, U> gf , Function2<? super V , Optional<U>, ? extends W> withf) {
         return zmap((c,v) -> withf.apply(v,  Optional.ofNullable(gf.apply(c) )));
     }
 
-    public <U,W> Mono2<C,W> getWithNonNull(Function<? super C, U> gf , Function2<? super V , U, ? extends W> withf, Function<? super C, Throwable> onNull) {
+    public <U,W> Mono2<C,W> mergeNonNull(Function<? super C, U> gf , Function2<? super V , U, ? extends W> withf, Function<? super C, Throwable> onNull) {
         return zmapT((c,v) ->
             Optional.ofNullable(gf.apply(c)).
                 intoTry(() -> onNull.apply(c)).
@@ -621,17 +620,21 @@ public class Mono2<C, V> {
         );
     }
 
-    public <U,W> Mono2<C,W> getWithNonNull(Function<? super C, U> gf , Function2<? super V , U, ? extends W> withf, String fmt , Object ... args) {
-        return getWithNonNull(gf,withf,c -> new NoSuchElementException(String.format(fmt,args)));
+    public <U,W> Mono2<C,W> mergeNonNull(Function<? super C, U> gf , Function2<? super V , U, ? extends W> withf, String fmt , Object ... args) {
+        return mergeNonNull(gf,withf,c -> new NoSuchElementException(String.format(fmt,args)));
     }
 
-    // onError 가 실행될 때,  실패 -> 성공으로 바뀌는 것 아님
+    public <CO> Mono2<CO, V> modify(Function1<C, CO> modifyf) {
+        return modify(modifyf,(c, err) -> modifyf.apply(c));
+    }
+
+    // onError 가 실행될 때,  실패 -> 성공으로 바뀌는 것 아님, 실패로 끝날때 리턴되는 C 를 변경하는 것
     public <CO> Mono2<CO, V> modify(Function1<C, CO> onSuccess, Function2<C,Throwable,CO> onError) {
         return keepEnv(mapHandle(mono, t -> t.map1(onSuccess)).onErrorMap(err -> remapContext(err, onError)));
     }
 
     // V 혹은 error 를 이용해서 C 를 modify 하는 경우
-    // onError 가 실행될 때,  실패 -> 성공으로 바뀌는 것 아님.
+    // onError 가 실행될 때,  실패 -> 성공으로 바뀌는 것 아님. 실패로 끝날때 리턴되는 C 를 변경하는 것
     public <CO> Mono2<CO, Tuple0> modifyWith(Function2<C, ? super V, CO> onSuccess, Function2<C,Throwable,CO> onError) {
         return keepEnv(mapHandle(mono, t -> Tuple.of(onSuccess.apply(t._1, t._2), Tuple0.instance())).onErrorMap(err -> remapContext(err, onError)));
     }
